@@ -1,0 +1,139 @@
+	fieldset {
+		margin:0;
+		padding:10px;
+		border:1px solid #cccccc;
+	}
+
+	legend {
+		margin:0;
+		padding:0;
+	}
+	
+	.selection {
+		display:block;
+		margin-left:5px;
+		text-decoration:none;
+		color:#666666;
+		padding:3px;
+		border-top:1px solid #cccccc;
+	}
+
+	body {
+	    font-family:Arial, sans-serif;
+	    font-size:12px;
+	}
+
+	.frame {
+	    width:760px;
+	    margin:0 auto 0 auto;
+	}
+
+	h1, h2, h3 {
+	    padding:0;
+	    margin:0 0 15px 0;
+	}
+
+	a {
+		cursor:pointer;
+		color:blue;
+		text-decoration:underline;
+	}
+
+	iframe {
+		width:100%;
+	}
+
+	.bordercover {
+		width:100%;
+		border:1px solid #cccccc;
+	}
+
+	#tedit {
+		border:1px solid #cccccc;
+		padding:10px;
+	}
+
+	#webtitle {}
+
+	#webnav {
+		margin:0 0 0 0;
+		padding:7px 7px 7px 2px;
+		background-color:#999999;
+	} #webnav a {
+		text-decoration:none;
+		color:#ffffff;
+		background-color:#999999;
+		border:1px solid #bbbbbb;
+		padding:5px;
+		margin:0 1px 0 0;
+	} #webnav a:hover {
+		background-color:#aaaaaa;
+		border:1px solid #cccccc;
+	}
+
+	#webcontent {
+		border:1px solid #cccccc;
+		padding:10px;
+	}
+
+	#webalert {
+		float:right;
+		text-decoration:blink;
+		color:#cccccc;
+	}
+
+	#webfooter {
+		margin:15px 0 0 0;
+		border-top:1px solid #999999;
+	}
+
+	#acosstatus {
+		border-bottom:1px dotted #cccccc;
+		margin:5px 0 10px 0;
+		padding:0 0 5px 0;
+	}
+
+	.mainpanel {
+		width:75%;
+	}
+
+	.smallpanel {
+		padding-left:5px;
+		width:25%;
+	}
+
+	.tag {
+		margin:5px;
+		padding:5px;
+		border:1px solid #cccccc;
+	}
+
+	.header {
+		padding:5px 5px 0 5px;
+		background-color:#999999;
+		color:#ffffff;
+		font-weight:700;
+		font-size:16px;
+	}
+
+	.desc {
+		padding:0 5px 5px 5px;
+		background-color:#999999;
+		color:#ffffff;
+		font-size:14px;
+		margin-bottom:10px;
+	}
+
+	.tag_header {
+		width:100%;
+		border-bottom:1px solid #cccccc;
+	}
+
+	.tag_content {
+		width:100%;
+		border-bottom:1px dotted #cccccc;
+	}
+
+	.index {
+		width:100px;
+	}

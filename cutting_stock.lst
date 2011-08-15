@@ -1,0 +1,1016 @@
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 1
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+   1  Scalar
+   2      c0      'cost per bundle'                                                   /20/
+   3      M       'max number of output coils that can be processed in one month'     /10/
+   4      L       'amount lost each time an input coil is cut'                        /1/;
+   5   
+   6  Sets
+   7      i       'number of input coils'                         /1*2/
+   8      j       'number of output coils'                        /0*3/
+   9      h       'number of input coils of type i purchased'     /1*20/
+  10      t       'number of periods we consider'                 /1*10/
+  11      s       'output coil size'                              /small, medium, large/
+  12      a(j)    'number for small output coils'                 /1*1/
+  13      b(j)    'number for medium output coils'                /2*2/
+  14      k(j)    'number for large output coils'                 /3*3/
+  15      small(s)  'small size'                                  /small/
+  16      medium(s) 'medium size'                                 /medium/
+  17      large(s)  'large size'                                  /large/;
+  18   
+  19  Parameters
+  20  IW(i) Input Coil Widths
+  21       /1         3
+  22        2         0/
+  23   
+  24  c(i) Input Coil Costs
+  25       /1         5
+  26        2        15/
+  27   
+  28  n(i) Input Coil per Bundle
+  29       /1        2
+  30        2        1/
+  31   
+  32  OW(j) Output Coil Widths
+  33       /1         2
+  34        2         3
+  35        3        30/
+  36   
+  37  P(j)  Product coil Price
+  38       /1        10
+  39        2        20
+  40        3        40/
+  41   
+  42  Cap(i) The inventory capacity for each input coil
+  43       /1        30
+  44        2        20/
+  45   
+  46  O(s) inventory capacity for output coil
+  47      /small       50
+  48       medium      60
+  49       large       40/
+  50   
+  51  Table d(j,t) Expected Demand
+  52           1         2           3    4   5   6   7   8   9   10
+  53  1        0         0           0    0   0   0   0   0   0   0
+  54  2        0         0           0    0   0   0   0   0   0 100
+  55  3        0         0           0    0   0   0   0   0   0   0;
+  56   
+  57   
+  58  Variables
+  59  x(i,t)        'number of input coil i purchased in month t'
+  60  y(i,h,j,t)    'number of output coil j produced by input coil i in month t'
+  61  sold(j,t)     'number of output coil j sold in month t'
+  62  r(i,t)        'total number of unused input coil i in month t'
+  63  Out(j,t)      'number of inventory for type j output coil from month t'
+  64  In(i,t)       'number of inventory for type i input coil from month t'
+  65  BP(t)         'number of bundles purchased in month t'
+  66  v(i,t)        'number of individual input coil i purchased in month t'
+  67  count(i,h,t)
+  68  z total profit;
+  69   
+  70  binary variables
+  71  count;
+  72   
+  73  integer variables
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 2
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+  74  x
+  75  y
+  76  sold
+  77  BP
+  78  r
+  79  In
+  80  Out
+  81  v;
+  82   
+  83  Equations
+  84  profit              the objective function
+  85  totOut(t)      the total output constraint
+  86  cut(i,t)            the cutting constraint
+  87  inputLimA(i,t)     the process for the input constraint
+  88  inputLimB(i,t)     the limit for the input inventory
+  89  storageA(j,t)
+  90  storageB(i,t)
+  91  storageS(small,t)
+  92  storageM(medium,t)
+  93  storageL(large,t)
+  94  orderA(j,t)
+  95  orderB(j,t)
+  96  chckWdth(i,j,h,t)
+  97  chckShve(i,j,t)
+  98  chckWste(i,h,t)
+  99  blahA(i,h,t)
+ 100  blahB(i,h,t)
+ 101  blahC(i,t)
+ 102  bundle(i,t)         the bundle constraint;
+ 103   
+ 104  *------------------
+ 105  * Set upper bounds
+ 106  *------------------
+ 107  x.up(i,t) = 1000000;
+ 108  y.up(i,h,j,t) = 1000000;
+ 109  sold.up(j,t) = d(j,t);
+ 110  r.up(i,t) = 1000000;
+ 111  BP.up(t) = 1000000;
+ 112  v.up(i,t) = 1000000;
+ 113   
+ 114  *------------------
+ 115  * Set lower bounds
+ 116  *------------------
+ 117  *In.lo(i,t) = 0;
+ 118  *Out.lo(j,t) = 0;
+ 119  *r.lo(i,t) = 0;
+ 120  *sold.lo(j,t) = 0;
+ 121  *v.lo(i,t) = 0;
+ 122  *BP.lo(t) = 0;
+ 123  *x.lo(i,t) = 0;
+ 124  *y.lo(i,h,j,t) = 0;
+ 125   
+ 126  *-----------
+ 127  * Equations
+ 128  *-----------
+ 129  profit .. z =e= sum(t, sum(j,P(j)*sold(j,t))- BP(t)*c0 - sum(i,v(i,t)*c(i)));
+ 130   
+ 131  totOut(t) .. sum((i,j,h),y(i,h,j,t)) =l= M;
+ 132   
+ 133  cut(i,t) .. (In(i,t-1) + x(i,t))*IW(i) =g= sum ((j,h), OW(j)*y(i,h,j,t)) + (sum((j,h), y(i,h,j,t)$(IW(i) - OW(j) gt L
+      )) -x(i,t))*L + r(i,t)*IW(i);
+ 134   
+ 135  chckWste(i,h,t).. IW(i) =g= sum(j, y(i,h,j,t)*OW(j)) + (sum(j, y(i,h,j,t))-1)*L;
+ 136   
+ 137  storageA(j,t) .. Out(j,t-1) + sum((i,h), y(i,h,j,t)) - sold(j,t) =g= Out(j,t);
+ 138  storageB(i,t) .. r(i,t) =g= In(i,t);
+ 139   
+ 140  storageS(small,t) .. sum(a(j), Out(j,t)) =l= O(small);
+ 141  storageM(medium,t) .. sum(b(j), Out(j,t)) =l= O(medium);
+ 142  storageL(large,t) .. sum(k(j), Out(j,t)) =l= O(large);
+ 143   
+ 144  orderA(j,t) .. Out(j,t-1) + sum((i,h), y(i,h,j,t)) =g= sold(j,t);
+ 145  orderB(j,t) .. sold(j,t) =l= d(j,t);
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 3
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 146   
+ 147  inputLimA(i,t) .. In(i,t) =l= Cap(i);
+ 148   
+ 149  inputLimB(i,t) .. r(i,t) =l= x(i,t) + In(i, t-1);
+ 150   
+ 151  bundle(i,t) .. BP(t)*n(i) + v(i,t) =e= x(i,t);
+ 152   
+ 153  chckWdth(i,j,h,t) .. y(i,h,j,t)$(OW(j) ge IW(i)+1) =e= 0;
+ 154   
+ 155  chckShve(i,j,t) .. sum(h, y(i,h,j,t))$(IW(i) - OW(j) le L) =l= In(i,t-1) + x(i,t);
+ 156   
+ 157  *blahA(i,h,t) .. sum(j, y(i,h,j,t)) =l= In(i,t-1) + x(i,t);
+ 158  blahA(i,h,t) .. sum(j, y(i,h,j,t)) =l= 20000000*count(i,h,t);
+ 159  blahB(i,h,t) .. sum(j, y(i,h,j,t)) =g= count(i,h,t);
+ 160  blahC(i,t) .. sum(h, count(i,h,t)) + r(i,t) =e= In(i,t-1) + x(i,t);
+ 161   
+ 162  Model coil /all/;
+ 163  coil.optfile = 1;
+ 164   
+ 165  Solve coil using mip maximizing z;
+
+
+COMPILATION TIME     =        0.024 SECONDS      3 Mb  LNX222-145 Apr 19, 2006
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 4
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+---- profit  =E=  the objective function
+
+profit..  - 10*sold(1,1) - 10*sold(1,2) - 10*sold(1,3) - 10*sold(1,4) - 10*sold(1,5) - 10*sold(1,6) - 10*sold(1,7)
+     
+      - 10*sold(1,8) - 10*sold(1,9) - 10*sold(1,10) - 20*sold(2,1) - 20*sold(2,2) - 20*sold(2,3) - 20*sold(2,4)
+     
+      - 20*sold(2,5) - 20*sold(2,6) - 20*sold(2,7) - 20*sold(2,8) - 20*sold(2,9) - 20*sold(2,10) - 40*sold(3,1)
+     
+      - 40*sold(3,2) - 40*sold(3,3) - 40*sold(3,4) - 40*sold(3,5) - 40*sold(3,6) - 40*sold(3,7) - 40*sold(3,8)
+     
+      - 40*sold(3,9) - 40*sold(3,10) + 20*BP(1) + 20*BP(2) + 20*BP(3) + 20*BP(4) + 20*BP(5) + 20*BP(6) + 20*BP(7)
+     
+      + 20*BP(8) + 20*BP(9) + 20*BP(10) + 5*v(1,1) + 5*v(1,2) + 5*v(1,3) + 5*v(1,4) + 5*v(1,5) + 5*v(1,6) + 5*v(1,7)
+     
+      + 5*v(1,8) + 5*v(1,9) + 5*v(1,10) + 15*v(2,1) + 15*v(2,2) + 15*v(2,3) + 15*v(2,4) + 15*v(2,5) + 15*v(2,6) + 15*v(2,7)
+     
+      + 15*v(2,8) + 15*v(2,9) + 15*v(2,10) + z =E= 0 ; (LHS = 0)
+     
+
+---- totOut  =L=  the total output constraint
+
+totOut(1)..  y(1,1,1,1) + y(1,1,2,1) + y(1,1,0,1) + y(1,1,3,1) + y(1,2,1,1) + y(1,2,2,1) + y(1,2,0,1) + y(1,2,3,1)
+     
+      + y(1,3,1,1) + y(1,3,2,1) + y(1,3,0,1) + y(1,3,3,1) + y(1,4,1,1) + y(1,4,2,1) + y(1,4,0,1) + y(1,4,3,1) + y(1,5,1,1)
+     
+      + y(1,5,2,1) + y(1,5,0,1) + y(1,5,3,1) + y(1,6,1,1) + y(1,6,2,1) + y(1,6,0,1) + y(1,6,3,1) + y(1,7,1,1) + y(1,7,2,1)
+     
+      + y(1,7,0,1) + y(1,7,3,1) + y(1,8,1,1) + y(1,8,2,1) + y(1,8,0,1) + y(1,8,3,1) + y(1,9,1,1) + y(1,9,2,1) + y(1,9,0,1)
+     
+      + y(1,9,3,1) + y(1,10,1,1) + y(1,10,2,1) + y(1,10,0,1) + y(1,10,3,1) + y(1,11,1,1) + y(1,11,2,1) + y(1,11,0,1)
+     
+      + y(1,11,3,1) + y(1,12,1,1) + y(1,12,2,1) + y(1,12,0,1) + y(1,12,3,1) + y(1,13,1,1) + y(1,13,2,1) + y(1,13,0,1)
+     
+      + y(1,13,3,1) + y(1,14,1,1) + y(1,14,2,1) + y(1,14,0,1) + y(1,14,3,1) + y(1,15,1,1) + y(1,15,2,1) + y(1,15,0,1)
+     
+      + y(1,15,3,1) + y(1,16,1,1) + y(1,16,2,1) + y(1,16,0,1) + y(1,16,3,1) + y(1,17,1,1) + y(1,17,2,1) + y(1,17,0,1)
+     
+      + y(1,17,3,1) + y(1,18,1,1) + y(1,18,2,1) + y(1,18,0,1) + y(1,18,3,1) + y(1,19,1,1) + y(1,19,2,1) + y(1,19,0,1)
+     
+      + y(1,19,3,1) + y(1,20,1,1) + y(1,20,2,1) + y(1,20,0,1) + y(1,20,3,1) + y(2,1,1,1) + y(2,1,2,1) + y(2,1,0,1)
+     
+      + y(2,1,3,1) + y(2,2,1,1) + y(2,2,2,1) + y(2,2,0,1) + y(2,2,3,1) + y(2,3,1,1) + y(2,3,2,1) + y(2,3,0,1) + y(2,3,3,1)
+     
+      + y(2,4,1,1) + y(2,4,2,1) + y(2,4,0,1) + y(2,4,3,1) + y(2,5,1,1) + y(2,5,2,1) + y(2,5,0,1) + y(2,5,3,1) + y(2,6,1,1)
+     
+      + y(2,6,2,1) + y(2,6,0,1) + y(2,6,3,1) + y(2,7,1,1) + y(2,7,2,1) + y(2,7,0,1) + y(2,7,3,1) + y(2,8,1,1) + y(2,8,2,1)
+     
+      + y(2,8,0,1) + y(2,8,3,1) + y(2,9,1,1) + y(2,9,2,1) + y(2,9,0,1) + y(2,9,3,1) + y(2,10,1,1) + y(2,10,2,1)
+     
+      + y(2,10,0,1) + y(2,10,3,1) + y(2,11,1,1) + y(2,11,2,1) + y(2,11,0,1) + y(2,11,3,1) + y(2,12,1,1) + y(2,12,2,1)
+     
+      + y(2,12,0,1) + y(2,12,3,1) + y(2,13,1,1) + y(2,13,2,1) + y(2,13,0,1) + y(2,13,3,1) + y(2,14,1,1) + y(2,14,2,1)
+     
+      + y(2,14,0,1) + y(2,14,3,1) + y(2,15,1,1) + y(2,15,2,1) + y(2,15,0,1) + y(2,15,3,1) + y(2,16,1,1) + y(2,16,2,1)
+     
+      + y(2,16,0,1) + y(2,16,3,1) + y(2,17,1,1) + y(2,17,2,1) + y(2,17,0,1) + y(2,17,3,1) + y(2,18,1,1) + y(2,18,2,1)
+     
+      + y(2,18,0,1) + y(2,18,3,1) + y(2,19,1,1) + y(2,19,2,1) + y(2,19,0,1) + y(2,19,3,1) + y(2,20,1,1) + y(2,20,2,1)
+     
+      + y(2,20,0,1) + y(2,20,3,1) =L= 10 ; (LHS = 0)
+     
+totOut(2)..  y(1,1,1,2) + y(1,1,2,2) + y(1,1,0,2) + y(1,1,3,2) + y(1,2,1,2) + y(1,2,2,2) + y(1,2,0,2) + y(1,2,3,2)
+     
+      + y(1,3,1,2) + y(1,3,2,2) + y(1,3,0,2) + y(1,3,3,2) + y(1,4,1,2) + y(1,4,2,2) + y(1,4,0,2) + y(1,4,3,2) + y(1,5,1,2)
+     
+      + y(1,5,2,2) + y(1,5,0,2) + y(1,5,3,2) + y(1,6,1,2) + y(1,6,2,2) + y(1,6,0,2) + y(1,6,3,2) + y(1,7,1,2) + y(1,7,2,2)
+     
+      + y(1,7,0,2) + y(1,7,3,2) + y(1,8,1,2) + y(1,8,2,2) + y(1,8,0,2) + y(1,8,3,2) + y(1,9,1,2) + y(1,9,2,2) + y(1,9,0,2)
+     
+      + y(1,9,3,2) + y(1,10,1,2) + y(1,10,2,2) + y(1,10,0,2) + y(1,10,3,2) + y(1,11,1,2) + y(1,11,2,2) + y(1,11,0,2)
+     
+      + y(1,11,3,2) + y(1,12,1,2) + y(1,12,2,2) + y(1,12,0,2) + y(1,12,3,2) + y(1,13,1,2) + y(1,13,2,2) + y(1,13,0,2)
+     
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 5
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+     totOut  =L=  the total output constraint     
+     
+      + y(1,13,3,2) + y(1,14,1,2) + y(1,14,2,2) + y(1,14,0,2) + y(1,14,3,2) + y(1,15,1,2) + y(1,15,2,2) + y(1,15,0,2)
+     
+      + y(1,15,3,2) + y(1,16,1,2) + y(1,16,2,2) + y(1,16,0,2) + y(1,16,3,2) + y(1,17,1,2) + y(1,17,2,2) + y(1,17,0,2)
+     
+      + y(1,17,3,2) + y(1,18,1,2) + y(1,18,2,2) + y(1,18,0,2) + y(1,18,3,2) + y(1,19,1,2) + y(1,19,2,2) + y(1,19,0,2)
+     
+      + y(1,19,3,2) + y(1,20,1,2) + y(1,20,2,2) + y(1,20,0,2) + y(1,20,3,2) + y(2,1,1,2) + y(2,1,2,2) + y(2,1,0,2)
+     
+      + y(2,1,3,2) + y(2,2,1,2) + y(2,2,2,2) + y(2,2,0,2) + y(2,2,3,2) + y(2,3,1,2) + y(2,3,2,2) + y(2,3,0,2) + y(2,3,3,2)
+     
+      + y(2,4,1,2) + y(2,4,2,2) + y(2,4,0,2) + y(2,4,3,2) + y(2,5,1,2) + y(2,5,2,2) + y(2,5,0,2) + y(2,5,3,2) + y(2,6,1,2)
+     
+      + y(2,6,2,2) + y(2,6,0,2) + y(2,6,3,2) + y(2,7,1,2) + y(2,7,2,2) + y(2,7,0,2) + y(2,7,3,2) + y(2,8,1,2) + y(2,8,2,2)
+     
+      + y(2,8,0,2) + y(2,8,3,2) + y(2,9,1,2) + y(2,9,2,2) + y(2,9,0,2) + y(2,9,3,2) + y(2,10,1,2) + y(2,10,2,2)
+     
+      + y(2,10,0,2) + y(2,10,3,2) + y(2,11,1,2) + y(2,11,2,2) + y(2,11,0,2) + y(2,11,3,2) + y(2,12,1,2) + y(2,12,2,2)
+     
+      + y(2,12,0,2) + y(2,12,3,2) + y(2,13,1,2) + y(2,13,2,2) + y(2,13,0,2) + y(2,13,3,2) + y(2,14,1,2) + y(2,14,2,2)
+     
+      + y(2,14,0,2) + y(2,14,3,2) + y(2,15,1,2) + y(2,15,2,2) + y(2,15,0,2) + y(2,15,3,2) + y(2,16,1,2) + y(2,16,2,2)
+     
+      + y(2,16,0,2) + y(2,16,3,2) + y(2,17,1,2) + y(2,17,2,2) + y(2,17,0,2) + y(2,17,3,2) + y(2,18,1,2) + y(2,18,2,2)
+     
+      + y(2,18,0,2) + y(2,18,3,2) + y(2,19,1,2) + y(2,19,2,2) + y(2,19,0,2) + y(2,19,3,2) + y(2,20,1,2) + y(2,20,2,2)
+     
+      + y(2,20,0,2) + y(2,20,3,2) =L= 10 ; (LHS = 0)
+     
+totOut(3)..  y(1,1,1,3) + y(1,1,2,3) + y(1,1,0,3) + y(1,1,3,3) + y(1,2,1,3) + y(1,2,2,3) + y(1,2,0,3) + y(1,2,3,3)
+     
+      + y(1,3,1,3) + y(1,3,2,3) + y(1,3,0,3) + y(1,3,3,3) + y(1,4,1,3) + y(1,4,2,3) + y(1,4,0,3) + y(1,4,3,3) + y(1,5,1,3)
+     
+      + y(1,5,2,3) + y(1,5,0,3) + y(1,5,3,3) + y(1,6,1,3) + y(1,6,2,3) + y(1,6,0,3) + y(1,6,3,3) + y(1,7,1,3) + y(1,7,2,3)
+     
+      + y(1,7,0,3) + y(1,7,3,3) + y(1,8,1,3) + y(1,8,2,3) + y(1,8,0,3) + y(1,8,3,3) + y(1,9,1,3) + y(1,9,2,3) + y(1,9,0,3)
+     
+      + y(1,9,3,3) + y(1,10,1,3) + y(1,10,2,3) + y(1,10,0,3) + y(1,10,3,3) + y(1,11,1,3) + y(1,11,2,3) + y(1,11,0,3)
+     
+      + y(1,11,3,3) + y(1,12,1,3) + y(1,12,2,3) + y(1,12,0,3) + y(1,12,3,3) + y(1,13,1,3) + y(1,13,2,3) + y(1,13,0,3)
+     
+      + y(1,13,3,3) + y(1,14,1,3) + y(1,14,2,3) + y(1,14,0,3) + y(1,14,3,3) + y(1,15,1,3) + y(1,15,2,3) + y(1,15,0,3)
+     
+      + y(1,15,3,3) + y(1,16,1,3) + y(1,16,2,3) + y(1,16,0,3) + y(1,16,3,3) + y(1,17,1,3) + y(1,17,2,3) + y(1,17,0,3)
+     
+      + y(1,17,3,3) + y(1,18,1,3) + y(1,18,2,3) + y(1,18,0,3) + y(1,18,3,3) + y(1,19,1,3) + y(1,19,2,3) + y(1,19,0,3)
+     
+      + y(1,19,3,3) + y(1,20,1,3) + y(1,20,2,3) + y(1,20,0,3) + y(1,20,3,3) + y(2,1,1,3) + y(2,1,2,3) + y(2,1,0,3)
+     
+      + y(2,1,3,3) + y(2,2,1,3) + y(2,2,2,3) + y(2,2,0,3) + y(2,2,3,3) + y(2,3,1,3) + y(2,3,2,3) + y(2,3,0,3) + y(2,3,3,3)
+     
+      + y(2,4,1,3) + y(2,4,2,3) + y(2,4,0,3) + y(2,4,3,3) + y(2,5,1,3) + y(2,5,2,3) + y(2,5,0,3) + y(2,5,3,3) + y(2,6,1,3)
+     
+      + y(2,6,2,3) + y(2,6,0,3) + y(2,6,3,3) + y(2,7,1,3) + y(2,7,2,3) + y(2,7,0,3) + y(2,7,3,3) + y(2,8,1,3) + y(2,8,2,3)
+     
+      + y(2,8,0,3) + y(2,8,3,3) + y(2,9,1,3) + y(2,9,2,3) + y(2,9,0,3) + y(2,9,3,3) + y(2,10,1,3) + y(2,10,2,3)
+     
+      + y(2,10,0,3) + y(2,10,3,3) + y(2,11,1,3) + y(2,11,2,3) + y(2,11,0,3) + y(2,11,3,3) + y(2,12,1,3) + y(2,12,2,3)
+     
+      + y(2,12,0,3) + y(2,12,3,3) + y(2,13,1,3) + y(2,13,2,3) + y(2,13,0,3) + y(2,13,3,3) + y(2,14,1,3) + y(2,14,2,3)
+     
+      + y(2,14,0,3) + y(2,14,3,3) + y(2,15,1,3) + y(2,15,2,3) + y(2,15,0,3) + y(2,15,3,3) + y(2,16,1,3) + y(2,16,2,3)
+     
+      + y(2,16,0,3) + y(2,16,3,3) + y(2,17,1,3) + y(2,17,2,3) + y(2,17,0,3) + y(2,17,3,3) + y(2,18,1,3) + y(2,18,2,3)
+     
+      + y(2,18,0,3) + y(2,18,3,3) + y(2,19,1,3) + y(2,19,2,3) + y(2,19,0,3) + y(2,19,3,3) + y(2,20,1,3) + y(2,20,2,3)
+     
+      + y(2,20,0,3) + y(2,20,3,3) =L= 10 ; (LHS = 0)
+     
+REMAINING 7 ENTRIES SKIPPED
+
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 6
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+---- cut  =G=  the cutting constraint
+
+cut(1,1)..  4*x(1,1) - 2*y(1,1,1,1) - 3*y(1,1,2,1) - y(1,1,0,1) - 30*y(1,1,3,1) - 2*y(1,2,1,1) - 3*y(1,2,2,1) - y(1,2,0,1)
+     
+      - 30*y(1,2,3,1) - 2*y(1,3,1,1) - 3*y(1,3,2,1) - y(1,3,0,1) - 30*y(1,3,3,1) - 2*y(1,4,1,1) - 3*y(1,4,2,1) - y(1,4,0,1)
+     
+      - 30*y(1,4,3,1) - 2*y(1,5,1,1) - 3*y(1,5,2,1) - y(1,5,0,1) - 30*y(1,5,3,1) - 2*y(1,6,1,1) - 3*y(1,6,2,1) - y(1,6,0,1)
+     
+      - 30*y(1,6,3,1) - 2*y(1,7,1,1) - 3*y(1,7,2,1) - y(1,7,0,1) - 30*y(1,7,3,1) - 2*y(1,8,1,1) - 3*y(1,8,2,1) - y(1,8,0,1)
+     
+      - 30*y(1,8,3,1) - 2*y(1,9,1,1) - 3*y(1,9,2,1) - y(1,9,0,1) - 30*y(1,9,3,1) - 2*y(1,10,1,1) - 3*y(1,10,2,1)
+     
+      - y(1,10,0,1) - 30*y(1,10,3,1) - 2*y(1,11,1,1) - 3*y(1,11,2,1) - y(1,11,0,1) - 30*y(1,11,3,1) - 2*y(1,12,1,1)
+     
+      - 3*y(1,12,2,1) - y(1,12,0,1) - 30*y(1,12,3,1) - 2*y(1,13,1,1) - 3*y(1,13,2,1) - y(1,13,0,1) - 30*y(1,13,3,1)
+     
+      - 2*y(1,14,1,1) - 3*y(1,14,2,1) - y(1,14,0,1) - 30*y(1,14,3,1) - 2*y(1,15,1,1) - 3*y(1,15,2,1) - y(1,15,0,1)
+     
+      - 30*y(1,15,3,1) - 2*y(1,16,1,1) - 3*y(1,16,2,1) - y(1,16,0,1) - 30*y(1,16,3,1) - 2*y(1,17,1,1) - 3*y(1,17,2,1)
+     
+      - y(1,17,0,1) - 30*y(1,17,3,1) - 2*y(1,18,1,1) - 3*y(1,18,2,1) - y(1,18,0,1) - 30*y(1,18,3,1) - 2*y(1,19,1,1)
+     
+      - 3*y(1,19,2,1) - y(1,19,0,1) - 30*y(1,19,3,1) - 2*y(1,20,1,1) - 3*y(1,20,2,1) - y(1,20,0,1) - 30*y(1,20,3,1)
+     
+      - 3*r(1,1) =G= 0 ; (LHS = 0)
+     
+cut(1,2)..  4*x(1,2) - 2*y(1,1,1,2) - 3*y(1,1,2,2) - y(1,1,0,2) - 30*y(1,1,3,2) - 2*y(1,2,1,2) - 3*y(1,2,2,2) - y(1,2,0,2)
+     
+      - 30*y(1,2,3,2) - 2*y(1,3,1,2) - 3*y(1,3,2,2) - y(1,3,0,2) - 30*y(1,3,3,2) - 2*y(1,4,1,2) - 3*y(1,4,2,2) - y(1,4,0,2)
+     
+      - 30*y(1,4,3,2) - 2*y(1,5,1,2) - 3*y(1,5,2,2) - y(1,5,0,2) - 30*y(1,5,3,2) - 2*y(1,6,1,2) - 3*y(1,6,2,2) - y(1,6,0,2)
+     
+      - 30*y(1,6,3,2) - 2*y(1,7,1,2) - 3*y(1,7,2,2) - y(1,7,0,2) - 30*y(1,7,3,2) - 2*y(1,8,1,2) - 3*y(1,8,2,2) - y(1,8,0,2)
+     
+      - 30*y(1,8,3,2) - 2*y(1,9,1,2) - 3*y(1,9,2,2) - y(1,9,0,2) - 30*y(1,9,3,2) - 2*y(1,10,1,2) - 3*y(1,10,2,2)
+     
+      - y(1,10,0,2) - 30*y(1,10,3,2) - 2*y(1,11,1,2) - 3*y(1,11,2,2) - y(1,11,0,2) - 30*y(1,11,3,2) - 2*y(1,12,1,2)
+     
+      - 3*y(1,12,2,2) - y(1,12,0,2) - 30*y(1,12,3,2) - 2*y(1,13,1,2) - 3*y(1,13,2,2) - y(1,13,0,2) - 30*y(1,13,3,2)
+     
+      - 2*y(1,14,1,2) - 3*y(1,14,2,2) - y(1,14,0,2) - 30*y(1,14,3,2) - 2*y(1,15,1,2) - 3*y(1,15,2,2) - y(1,15,0,2)
+     
+      - 30*y(1,15,3,2) - 2*y(1,16,1,2) - 3*y(1,16,2,2) - y(1,16,0,2) - 30*y(1,16,3,2) - 2*y(1,17,1,2) - 3*y(1,17,2,2)
+     
+      - y(1,17,0,2) - 30*y(1,17,3,2) - 2*y(1,18,1,2) - 3*y(1,18,2,2) - y(1,18,0,2) - 30*y(1,18,3,2) - 2*y(1,19,1,2)
+     
+      - 3*y(1,19,2,2) - y(1,19,0,2) - 30*y(1,19,3,2) - 2*y(1,20,1,2) - 3*y(1,20,2,2) - y(1,20,0,2) - 30*y(1,20,3,2)
+     
+      - 3*r(1,2) + 3*In(1,1) =G= 0 ; (LHS = 0)
+     
+cut(1,3)..  4*x(1,3) - 2*y(1,1,1,3) - 3*y(1,1,2,3) - y(1,1,0,3) - 30*y(1,1,3,3) - 2*y(1,2,1,3) - 3*y(1,2,2,3) - y(1,2,0,3)
+     
+      - 30*y(1,2,3,3) - 2*y(1,3,1,3) - 3*y(1,3,2,3) - y(1,3,0,3) - 30*y(1,3,3,3) - 2*y(1,4,1,3) - 3*y(1,4,2,3) - y(1,4,0,3)
+     
+      - 30*y(1,4,3,3) - 2*y(1,5,1,3) - 3*y(1,5,2,3) - y(1,5,0,3) - 30*y(1,5,3,3) - 2*y(1,6,1,3) - 3*y(1,6,2,3) - y(1,6,0,3)
+     
+      - 30*y(1,6,3,3) - 2*y(1,7,1,3) - 3*y(1,7,2,3) - y(1,7,0,3) - 30*y(1,7,3,3) - 2*y(1,8,1,3) - 3*y(1,8,2,3) - y(1,8,0,3)
+     
+      - 30*y(1,8,3,3) - 2*y(1,9,1,3) - 3*y(1,9,2,3) - y(1,9,0,3) - 30*y(1,9,3,3) - 2*y(1,10,1,3) - 3*y(1,10,2,3)
+     
+      - y(1,10,0,3) - 30*y(1,10,3,3) - 2*y(1,11,1,3) - 3*y(1,11,2,3) - y(1,11,0,3) - 30*y(1,11,3,3) - 2*y(1,12,1,3)
+     
+      - 3*y(1,12,2,3) - y(1,12,0,3) - 30*y(1,12,3,3) - 2*y(1,13,1,3) - 3*y(1,13,2,3) - y(1,13,0,3) - 30*y(1,13,3,3)
+     
+      - 2*y(1,14,1,3) - 3*y(1,14,2,3) - y(1,14,0,3) - 30*y(1,14,3,3) - 2*y(1,15,1,3) - 3*y(1,15,2,3) - y(1,15,0,3)
+     
+      - 30*y(1,15,3,3) - 2*y(1,16,1,3) - 3*y(1,16,2,3) - y(1,16,0,3) - 30*y(1,16,3,3) - 2*y(1,17,1,3) - 3*y(1,17,2,3)
+     
+      - y(1,17,0,3) - 30*y(1,17,3,3) - 2*y(1,18,1,3) - 3*y(1,18,2,3) - y(1,18,0,3) - 30*y(1,18,3,3) - 2*y(1,19,1,3)
+     
+      - 3*y(1,19,2,3) - y(1,19,0,3) - 30*y(1,19,3,3) - 2*y(1,20,1,3) - 3*y(1,20,2,3) - y(1,20,0,3) - 30*y(1,20,3,3)
+     
+      - 3*r(1,3) + 3*In(1,2) =G= 0 ; (LHS = 0)
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 7
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+     cut  =G=  the cutting constraint
+
+REMAINING 17 ENTRIES SKIPPED
+
+
+---- inputLimA  =L=  the process for the input constraint
+
+inputLimA(1,1)..  In(1,1) =L= 30 ; (LHS = 0)
+     
+inputLimA(1,2)..  In(1,2) =L= 30 ; (LHS = 0)
+     
+inputLimA(1,3)..  In(1,3) =L= 30 ; (LHS = 0)
+     
+REMAINING 17 ENTRIES SKIPPED
+
+
+---- inputLimB  =L=  the limit for the input inventory
+
+inputLimB(1,1)..  - x(1,1) + r(1,1) =L= 0 ; (LHS = 0)
+     
+inputLimB(1,2)..  - x(1,2) + r(1,2) - In(1,1) =L= 0 ; (LHS = 0)
+     
+inputLimB(1,3)..  - x(1,3) + r(1,3) - In(1,2) =L= 0 ; (LHS = 0)
+     
+REMAINING 17 ENTRIES SKIPPED
+
+
+---- storageA  =G=  
+
+storageA(1,1)..  y(1,1,1,1) + y(1,2,1,1) + y(1,3,1,1) + y(1,4,1,1) + y(1,5,1,1) + y(1,6,1,1) + y(1,7,1,1) + y(1,8,1,1)
+     
+      + y(1,9,1,1) + y(1,10,1,1) + y(1,11,1,1) + y(1,12,1,1) + y(1,13,1,1) + y(1,14,1,1) + y(1,15,1,1) + y(1,16,1,1)
+     
+      + y(1,17,1,1) + y(1,18,1,1) + y(1,19,1,1) + y(1,20,1,1) + y(2,1,1,1) + y(2,2,1,1) + y(2,3,1,1) + y(2,4,1,1)
+     
+      + y(2,5,1,1) + y(2,6,1,1) + y(2,7,1,1) + y(2,8,1,1) + y(2,9,1,1) + y(2,10,1,1) + y(2,11,1,1) + y(2,12,1,1)
+     
+      + y(2,13,1,1) + y(2,14,1,1) + y(2,15,1,1) + y(2,16,1,1) + y(2,17,1,1) + y(2,18,1,1) + y(2,19,1,1) + y(2,20,1,1)
+     
+      - sold(1,1) - Out(1,1) =G= 0 ; (LHS = 0)
+     
+storageA(1,2)..  y(1,1,1,2) + y(1,2,1,2) + y(1,3,1,2) + y(1,4,1,2) + y(1,5,1,2) + y(1,6,1,2) + y(1,7,1,2) + y(1,8,1,2)
+     
+      + y(1,9,1,2) + y(1,10,1,2) + y(1,11,1,2) + y(1,12,1,2) + y(1,13,1,2) + y(1,14,1,2) + y(1,15,1,2) + y(1,16,1,2)
+     
+      + y(1,17,1,2) + y(1,18,1,2) + y(1,19,1,2) + y(1,20,1,2) + y(2,1,1,2) + y(2,2,1,2) + y(2,3,1,2) + y(2,4,1,2)
+     
+      + y(2,5,1,2) + y(2,6,1,2) + y(2,7,1,2) + y(2,8,1,2) + y(2,9,1,2) + y(2,10,1,2) + y(2,11,1,2) + y(2,12,1,2)
+     
+      + y(2,13,1,2) + y(2,14,1,2) + y(2,15,1,2) + y(2,16,1,2) + y(2,17,1,2) + y(2,18,1,2) + y(2,19,1,2) + y(2,20,1,2)
+     
+      - sold(1,2) + Out(1,1) - Out(1,2) =G= 0 ; (LHS = 0)
+     
+storageA(1,3)..  y(1,1,1,3) + y(1,2,1,3) + y(1,3,1,3) + y(1,4,1,3) + y(1,5,1,3) + y(1,6,1,3) + y(1,7,1,3) + y(1,8,1,3)
+     
+      + y(1,9,1,3) + y(1,10,1,3) + y(1,11,1,3) + y(1,12,1,3) + y(1,13,1,3) + y(1,14,1,3) + y(1,15,1,3) + y(1,16,1,3)
+     
+      + y(1,17,1,3) + y(1,18,1,3) + y(1,19,1,3) + y(1,20,1,3) + y(2,1,1,3) + y(2,2,1,3) + y(2,3,1,3) + y(2,4,1,3)
+     
+      + y(2,5,1,3) + y(2,6,1,3) + y(2,7,1,3) + y(2,8,1,3) + y(2,9,1,3) + y(2,10,1,3) + y(2,11,1,3) + y(2,12,1,3)
+     
+      + y(2,13,1,3) + y(2,14,1,3) + y(2,15,1,3) + y(2,16,1,3) + y(2,17,1,3) + y(2,18,1,3) + y(2,19,1,3) + y(2,20,1,3)
+     
+      - sold(1,3) + Out(1,2) - Out(1,3) =G= 0 ; (LHS = 0)
+     
+REMAINING 37 ENTRIES SKIPPED
+
+
+---- storageB  =G=  
+
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 8
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+     storageB  =G=  
+
+storageB(1,1)..  r(1,1) - In(1,1) =G= 0 ; (LHS = 0)
+     
+storageB(1,2)..  r(1,2) - In(1,2) =G= 0 ; (LHS = 0)
+     
+storageB(1,3)..  r(1,3) - In(1,3) =G= 0 ; (LHS = 0)
+     
+REMAINING 17 ENTRIES SKIPPED
+
+
+---- storageS  =L=  
+
+storageS(small,1)..  Out(1,1) =L= 50 ; (LHS = 0)
+     
+storageS(small,2)..  Out(1,2) =L= 50 ; (LHS = 0)
+     
+storageS(small,3)..  Out(1,3) =L= 50 ; (LHS = 0)
+     
+REMAINING 7 ENTRIES SKIPPED
+
+
+---- storageM  =L=  
+
+storageM(medium,1)..  Out(2,1) =L= 60 ; (LHS = 0)
+     
+storageM(medium,2)..  Out(2,2) =L= 60 ; (LHS = 0)
+     
+storageM(medium,3)..  Out(2,3) =L= 60 ; (LHS = 0)
+     
+REMAINING 7 ENTRIES SKIPPED
+
+
+---- storageL  =L=  
+
+storageL(large,1)..  Out(3,1) =L= 40 ; (LHS = 0)
+     
+storageL(large,2)..  Out(3,2) =L= 40 ; (LHS = 0)
+     
+storageL(large,3)..  Out(3,3) =L= 40 ; (LHS = 0)
+     
+REMAINING 7 ENTRIES SKIPPED
+
+
+---- orderA  =G=  
+
+orderA(1,1)..  y(1,1,1,1) + y(1,2,1,1) + y(1,3,1,1) + y(1,4,1,1) + y(1,5,1,1) + y(1,6,1,1) + y(1,7,1,1) + y(1,8,1,1)
+     
+      + y(1,9,1,1) + y(1,10,1,1) + y(1,11,1,1) + y(1,12,1,1) + y(1,13,1,1) + y(1,14,1,1) + y(1,15,1,1) + y(1,16,1,1)
+     
+      + y(1,17,1,1) + y(1,18,1,1) + y(1,19,1,1) + y(1,20,1,1) + y(2,1,1,1) + y(2,2,1,1) + y(2,3,1,1) + y(2,4,1,1)
+     
+      + y(2,5,1,1) + y(2,6,1,1) + y(2,7,1,1) + y(2,8,1,1) + y(2,9,1,1) + y(2,10,1,1) + y(2,11,1,1) + y(2,12,1,1)
+     
+      + y(2,13,1,1) + y(2,14,1,1) + y(2,15,1,1) + y(2,16,1,1) + y(2,17,1,1) + y(2,18,1,1) + y(2,19,1,1) + y(2,20,1,1)
+     
+      - sold(1,1) =G= 0 ; (LHS = 0)
+     
+orderA(1,2)..  y(1,1,1,2) + y(1,2,1,2) + y(1,3,1,2) + y(1,4,1,2) + y(1,5,1,2) + y(1,6,1,2) + y(1,7,1,2) + y(1,8,1,2)
+     
+      + y(1,9,1,2) + y(1,10,1,2) + y(1,11,1,2) + y(1,12,1,2) + y(1,13,1,2) + y(1,14,1,2) + y(1,15,1,2) + y(1,16,1,2)
+     
+      + y(1,17,1,2) + y(1,18,1,2) + y(1,19,1,2) + y(1,20,1,2) + y(2,1,1,2) + y(2,2,1,2) + y(2,3,1,2) + y(2,4,1,2)
+     
+      + y(2,5,1,2) + y(2,6,1,2) + y(2,7,1,2) + y(2,8,1,2) + y(2,9,1,2) + y(2,10,1,2) + y(2,11,1,2) + y(2,12,1,2)
+     
+      + y(2,13,1,2) + y(2,14,1,2) + y(2,15,1,2) + y(2,16,1,2) + y(2,17,1,2) + y(2,18,1,2) + y(2,19,1,2) + y(2,20,1,2)
+     
+      - sold(1,2) + Out(1,1) =G= 0 ; (LHS = 0)
+     
+GAMS Rev 145  x86/Linux                                                                            07/03/06 18:26:35 Page 9
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+     orderA  =G=  
+
+orderA(1,3)..  y(1,1,1,3) + y(1,2,1,3) + y(1,3,1,3) + y(1,4,1,3) + y(1,5,1,3) + y(1,6,1,3) + y(1,7,1,3) + y(1,8,1,3)
+     
+      + y(1,9,1,3) + y(1,10,1,3) + y(1,11,1,3) + y(1,12,1,3) + y(1,13,1,3) + y(1,14,1,3) + y(1,15,1,3) + y(1,16,1,3)
+     
+      + y(1,17,1,3) + y(1,18,1,3) + y(1,19,1,3) + y(1,20,1,3) + y(2,1,1,3) + y(2,2,1,3) + y(2,3,1,3) + y(2,4,1,3)
+     
+      + y(2,5,1,3) + y(2,6,1,3) + y(2,7,1,3) + y(2,8,1,3) + y(2,9,1,3) + y(2,10,1,3) + y(2,11,1,3) + y(2,12,1,3)
+     
+      + y(2,13,1,3) + y(2,14,1,3) + y(2,15,1,3) + y(2,16,1,3) + y(2,17,1,3) + y(2,18,1,3) + y(2,19,1,3) + y(2,20,1,3)
+     
+      - sold(1,3) + Out(1,2) =G= 0 ; (LHS = 0)
+     
+REMAINING 37 ENTRIES SKIPPED
+
+
+---- orderB  =L=  
+
+orderB(1,1)..  sold(1,1) =L= 0 ; (LHS = 0)
+     
+orderB(1,2)..  sold(1,2) =L= 0 ; (LHS = 0)
+     
+orderB(1,3)..  sold(1,3) =L= 0 ; (LHS = 0)
+     
+REMAINING 37 ENTRIES SKIPPED
+
+
+---- chckWdth  =E=  
+
+chckWdth(1,3,1,1)..  y(1,1,3,1) =E= 0 ; (LHS = 0)
+     
+chckWdth(1,3,1,2)..  y(1,1,3,2) =E= 0 ; (LHS = 0)
+     
+chckWdth(1,3,1,3)..  y(1,1,3,3) =E= 0 ; (LHS = 0)
+     
+REMAINING 797 ENTRIES SKIPPED
+
+
+---- chckShve  =L=  
+
+chckShve(1,1,1)..  - x(1,1) + y(1,1,1,1) + y(1,2,1,1) + y(1,3,1,1) + y(1,4,1,1) + y(1,5,1,1) + y(1,6,1,1) + y(1,7,1,1)
+     
+      + y(1,8,1,1) + y(1,9,1,1) + y(1,10,1,1) + y(1,11,1,1) + y(1,12,1,1) + y(1,13,1,1) + y(1,14,1,1) + y(1,15,1,1)
+     
+      + y(1,16,1,1) + y(1,17,1,1) + y(1,18,1,1) + y(1,19,1,1) + y(1,20,1,1) =L= 0 ; (LHS = 0)
+     
+chckShve(1,1,2)..  - x(1,2) + y(1,1,1,2) + y(1,2,1,2) + y(1,3,1,2) + y(1,4,1,2) + y(1,5,1,2) + y(1,6,1,2) + y(1,7,1,2)
+     
+      + y(1,8,1,2) + y(1,9,1,2) + y(1,10,1,2) + y(1,11,1,2) + y(1,12,1,2) + y(1,13,1,2) + y(1,14,1,2) + y(1,15,1,2)
+     
+      + y(1,16,1,2) + y(1,17,1,2) + y(1,18,1,2) + y(1,19,1,2) + y(1,20,1,2) - In(1,1) =L= 0 ; (LHS = 0)
+     
+chckShve(1,1,3)..  - x(1,3) + y(1,1,1,3) + y(1,2,1,3) + y(1,3,1,3) + y(1,4,1,3) + y(1,5,1,3) + y(1,6,1,3) + y(1,7,1,3)
+     
+      + y(1,8,1,3) + y(1,9,1,3) + y(1,10,1,3) + y(1,11,1,3) + y(1,12,1,3) + y(1,13,1,3) + y(1,14,1,3) + y(1,15,1,3)
+     
+      + y(1,16,1,3) + y(1,17,1,3) + y(1,18,1,3) + y(1,19,1,3) + y(1,20,1,3) - In(1,2) =L= 0 ; (LHS = 0)
+     
+REMAINING 77 ENTRIES SKIPPED
+
+
+---- chckWste  =G=  
+
+chckWste(1,1,1)..  - 3*y(1,1,1,1) - 4*y(1,1,2,1) - y(1,1,0,1) - 31*y(1,1,3,1) =G= -4 ; (LHS = 0)
+     
+chckWste(1,1,2)..  - 3*y(1,1,1,2) - 4*y(1,1,2,2) - y(1,1,0,2) - 31*y(1,1,3,2) =G= -4 ; (LHS = 0)
+     
+chckWste(1,1,3)..  - 3*y(1,1,1,3) - 4*y(1,1,2,3) - y(1,1,0,3) - 31*y(1,1,3,3) =G= -4 ; (LHS = 0)
+     
+REMAINING 397 ENTRIES SKIPPED
+
+GAMS Rev 145  x86/Linux                                                                           07/03/06 18:26:35 Page 10
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE coil Using MIP From line 165
+
+
+---- blahA  =L=  
+
+blahA(1,1,1)..  y(1,1,1,1) + y(1,1,2,1) + y(1,1,0,1) + y(1,1,3,1) - 20000000*count(1,1,1) =L= 0 ; (LHS = 0)
+     
+blahA(1,1,2)..  y(1,1,1,2) + y(1,1,2,2) + y(1,1,0,2) + y(1,1,3,2) - 20000000*count(1,1,2) =L= 0 ; (LHS = 0)
+     
+blahA(1,1,3)..  y(1,1,1,3) + y(1,1,2,3) + y(1,1,0,3) + y(1,1,3,3) - 20000000*count(1,1,3) =L= 0 ; (LHS = 0)
+     
+REMAINING 397 ENTRIES SKIPPED
+
+
+---- blahB  =G=  
+
+blahB(1,1,1)..  y(1,1,1,1) + y(1,1,2,1) + y(1,1,0,1) + y(1,1,3,1) - count(1,1,1) =G= 0 ; (LHS = 0)
+     
+blahB(1,1,2)..  y(1,1,1,2) + y(1,1,2,2) + y(1,1,0,2) + y(1,1,3,2) - count(1,1,2) =G= 0 ; (LHS = 0)
+     
+blahB(1,1,3)..  y(1,1,1,3) + y(1,1,2,3) + y(1,1,0,3) + y(1,1,3,3) - count(1,1,3) =G= 0 ; (LHS = 0)
+     
+REMAINING 397 ENTRIES SKIPPED
+
+
+---- blahC  =E=  
+
+blahC(1,1)..  - x(1,1) + r(1,1) + count(1,1,1) + count(1,2,1) + count(1,3,1) + count(1,4,1) + count(1,5,1) + count(1,6,1)
+     
+      + count(1,7,1) + count(1,8,1) + count(1,9,1) + count(1,10,1) + count(1,11,1) + count(1,12,1) + count(1,13,1)
+     
+      + count(1,14,1) + count(1,15,1) + count(1,16,1) + count(1,17,1) + count(1,18,1) + count(1,19,1) + count(1,20,1) =E= 0
+      ; (LHS = 0)
+     
+blahC(1,2)..  - x(1,2) + r(1,2) - In(1,1) + count(1,1,2) + count(1,2,2) + count(1,3,2) + count(1,4,2) + count(1,5,2)
+     
+      + count(1,6,2) + count(1,7,2) + count(1,8,2) + count(1,9,2) + count(1,10,2) + count(1,11,2) + count(1,12,2)
+     
+      + count(1,13,2) + count(1,14,2) + count(1,15,2) + count(1,16,2) + count(1,17,2) + count(1,18,2) + count(1,19,2)
+     
+      + count(1,20,2) =E= 0 ; (LHS = 0)
+     
+blahC(1,3)..  - x(1,3) + r(1,3) - In(1,2) + count(1,1,3) + count(1,2,3) + count(1,3,3) + count(1,4,3) + count(1,5,3)
+     
+      + count(1,6,3) + count(1,7,3) + count(1,8,3) + count(1,9,3) + count(1,10,3) + count(1,11,3) + count(1,12,3)
+     
+      + count(1,13,3) + count(1,14,3) + count(1,15,3) + count(1,16,3) + count(1,17,3) + count(1,18,3) + count(1,19,3)
+     
+      + count(1,20,3) =E= 0 ; (LHS = 0)
+     
+REMAINING 17 ENTRIES SKIPPED
+
+
+---- bundle  =E=  the bundle constraint
+
+bundle(1,1)..  - x(1,1) + 2*BP(1) + v(1,1) =E= 0 ; (LHS = 0)
+     
+bundle(1,2)..  - x(1,2) + 2*BP(2) + v(1,2) =E= 0 ; (LHS = 0)
+     
+bundle(1,3)..  - x(1,3) + 2*BP(3) + v(1,3) =E= 0 ; (LHS = 0)
+     
+REMAINING 17 ENTRIES SKIPPED
+
+GAMS Rev 145  x86/Linux                                                                           07/03/06 18:26:35 Page 11
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Column Listing      SOLVE coil Using MIP From line 165
+
+
+---- x  number of input coil i purchased in month t
+
+x(1,1)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        4       cut(1,1)
+       -1       inputLimB(1,1)
+       -1       chckShve(1,1,1)
+       -1       chckShve(1,2,1)
+       -1       chckShve(1,0,1)
+       -1       chckShve(1,3,1)
+       -1       blahC(1,1)
+       -1       bundle(1,1)
+
+x(1,2)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        4       cut(1,2)
+       -1       inputLimB(1,2)
+       -1       chckShve(1,1,2)
+       -1       chckShve(1,2,2)
+       -1       chckShve(1,0,2)
+       -1       chckShve(1,3,2)
+       -1       blahC(1,2)
+       -1       bundle(1,2)
+
+x(1,3)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        4       cut(1,3)
+       -1       inputLimB(1,3)
+       -1       chckShve(1,1,3)
+       -1       chckShve(1,2,3)
+       -1       chckShve(1,0,3)
+       -1       chckShve(1,3,3)
+       -1       blahC(1,3)
+       -1       bundle(1,3)
+
+REMAINING 17 ENTRIES SKIPPED
+
+---- y  number of output coil j produced by input coil i in month t
+
+y(1,1,1,1)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        1       totOut(1)
+       -2       cut(1,1)
+        1       storageA(1,1)
+        1       orderA(1,1)
+        1       chckShve(1,1,1)
+       -3       chckWste(1,1,1)
+        1       blahA(1,1,1)
+        1       blahB(1,1,1)
+
+y(1,1,1,2)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        1       totOut(2)
+       -2       cut(1,2)
+        1       storageA(1,2)
+        1       orderA(1,2)
+        1       chckShve(1,1,2)
+       -3       chckWste(1,1,2)
+        1       blahA(1,1,2)
+        1       blahB(1,1,2)
+
+y(1,1,1,3)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        1       totOut(3)
+       -2       cut(1,3)
+        1       storageA(1,3)
+        1       orderA(1,3)
+        1       chckShve(1,1,3)
+       -3       chckWste(1,1,3)
+        1       blahA(1,1,3)
+        1       blahB(1,1,3)
+
+REMAINING 1597 ENTRIES SKIPPED
+GAMS Rev 145  x86/Linux                                                                           07/03/06 18:26:35 Page 12
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Column Listing      SOLVE coil Using MIP From line 165
+
+
+---- sold  number of output coil j sold in month t
+
+sold(1,1)
+                (.LO, .L, .UP = 0, 0, 0)
+      -10       profit
+       -1       storageA(1,1)
+       -1       orderA(1,1)
+        1       orderB(1,1)
+
+sold(1,2)
+                (.LO, .L, .UP = 0, 0, 0)
+      -10       profit
+       -1       storageA(1,2)
+       -1       orderA(1,2)
+        1       orderB(1,2)
+
+sold(1,3)
+                (.LO, .L, .UP = 0, 0, 0)
+      -10       profit
+       -1       storageA(1,3)
+       -1       orderA(1,3)
+        1       orderB(1,3)
+
+REMAINING 37 ENTRIES SKIPPED
+
+---- r  total number of unused input coil i in month t
+
+r(1,1)
+                (.LO, .L, .UP = 0, 0, 1000000)
+       -3       cut(1,1)
+        1       inputLimB(1,1)
+        1       storageB(1,1)
+        1       blahC(1,1)
+
+r(1,2)
+                (.LO, .L, .UP = 0, 0, 1000000)
+       -3       cut(1,2)
+        1       inputLimB(1,2)
+        1       storageB(1,2)
+        1       blahC(1,2)
+
+r(1,3)
+                (.LO, .L, .UP = 0, 0, 1000000)
+       -3       cut(1,3)
+        1       inputLimB(1,3)
+        1       storageB(1,3)
+        1       blahC(1,3)
+
+REMAINING 17 ENTRIES SKIPPED
+
+---- Out  number of inventory for type j output coil from month t
+
+Out(1,1)
+                (.LO, .L, .UP = 0, 0, 100)
+       -1       storageA(1,1)
+        1       storageA(1,2)
+        1       storageS(small,1)
+        1       orderA(1,2)
+
+Out(1,2)
+                (.LO, .L, .UP = 0, 0, 100)
+       -1       storageA(1,2)
+        1       storageA(1,3)
+        1       storageS(small,2)
+        1       orderA(1,3)
+
+Out(1,3)
+                (.LO, .L, .UP = 0, 0, 100)
+       -1       storageA(1,3)
+        1       storageA(1,4)
+        1       storageS(small,3)
+        1       orderA(1,4)
+
+GAMS Rev 145  x86/Linux                                                                           07/03/06 18:26:35 Page 13
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Column Listing      SOLVE coil Using MIP From line 165
+
+
+     Out  number of inventory for type j output coil from month t
+
+REMAINING 37 ENTRIES SKIPPED
+
+---- In  number of inventory for type i input coil from month t
+
+In(1,1)
+                (.LO, .L, .UP = 0, 0, 100)
+        3       cut(1,2)
+        1       inputLimA(1,1)
+       -1       inputLimB(1,2)
+       -1       storageB(1,1)
+       -1       chckShve(1,1,2)
+       -1       chckShve(1,2,2)
+       -1       chckShve(1,0,2)
+       -1       chckShve(1,3,2)
+       -1       blahC(1,2)
+
+In(1,2)
+                (.LO, .L, .UP = 0, 0, 100)
+        3       cut(1,3)
+        1       inputLimA(1,2)
+       -1       inputLimB(1,3)
+       -1       storageB(1,2)
+       -1       chckShve(1,1,3)
+       -1       chckShve(1,2,3)
+       -1       chckShve(1,0,3)
+       -1       chckShve(1,3,3)
+       -1       blahC(1,3)
+
+In(1,3)
+                (.LO, .L, .UP = 0, 0, 100)
+        3       cut(1,4)
+        1       inputLimA(1,3)
+       -1       inputLimB(1,4)
+       -1       storageB(1,3)
+       -1       chckShve(1,1,4)
+       -1       chckShve(1,2,4)
+       -1       chckShve(1,0,4)
+       -1       chckShve(1,3,4)
+       -1       blahC(1,4)
+
+REMAINING 17 ENTRIES SKIPPED
+
+---- BP  number of bundles purchased in month t
+
+BP(1)
+                (.LO, .L, .UP = 0, 0, 1000000)
+       20       profit
+        2       bundle(1,1)
+        1       bundle(2,1)
+
+BP(2)
+                (.LO, .L, .UP = 0, 0, 1000000)
+       20       profit
+        2       bundle(1,2)
+        1       bundle(2,2)
+
+BP(3)
+                (.LO, .L, .UP = 0, 0, 1000000)
+       20       profit
+        2       bundle(1,3)
+        1       bundle(2,3)
+
+REMAINING 7 ENTRIES SKIPPED
+
+---- v  number of individual input coil i purchased in month t
+
+v(1,1)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        5       profit
+        1       bundle(1,1)
+
+GAMS Rev 145  x86/Linux                                                                           07/03/06 18:26:35 Page 14
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Column Listing      SOLVE coil Using MIP From line 165
+
+
+     v  number of individual input coil i purchased in month t
+
+v(1,2)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        5       profit
+        1       bundle(1,2)
+
+v(1,3)
+                (.LO, .L, .UP = 0, 0, 1000000)
+        5       profit
+        1       bundle(1,3)
+
+REMAINING 17 ENTRIES SKIPPED
+
+---- count  
+
+count(1,1,1)
+                (.LO, .L, .UP = 0, 0, 1)
+  -2.000000E+7  blahA(1,1,1)
+       -1       blahB(1,1,1)
+        1       blahC(1,1)
+
+count(1,1,2)
+                (.LO, .L, .UP = 0, 0, 1)
+  -2.000000E+7  blahA(1,1,2)
+       -1       blahB(1,1,2)
+        1       blahC(1,2)
+
+count(1,1,3)
+                (.LO, .L, .UP = 0, 0, 1)
+  -2.000000E+7  blahA(1,1,3)
+       -1       blahB(1,1,3)
+        1       blahC(1,3)
+
+REMAINING 397 ENTRIES SKIPPED
+
+---- z  total profit
+
+z
+                (.LO, .L, .UP = -INF, 0, +INF)
+        1       profit
+
+GAMS Rev 145  x86/Linux                                                                           07/03/06 18:26:35 Page 15
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Model Statistics    SOLVE coil Using MIP From line 165
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          19     SINGLE EQUATIONS        2,361
+BLOCKS OF VARIABLES          10     SINGLE VARIABLES        2,171
+NON ZERO ELEMENTS        15,150     DISCRETE VARIABLES      2,131
+
+
+
+**** THE MODEL EXCEEDS THE DEMO LIMITS
+**** MAX MATRIX ROWS          300
+**** MAX MATRIX COLUMNS       300
+**** MAX NON ZERO ELEMENTS   2000
+**** MAX NON LINEAR N-Z      1000
+**** MAX DISCRETE VARIABLES    50
+**** Terminated due to a licensing error
+
+     GAMS Development Corporation, Washington, DC   G871201/0000CA-ANY
+     Free Demo,  202-342-0180,  sales@gams.com,  www.gams.com         
+     12345678000000                                                   
+     01234567000000                                                   
+     DC0000       Ref: Generated by Base            A Demo            

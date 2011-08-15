@@ -1,0 +1,2 @@
+gams/gams input/$1.gms
+mv $1.lst output/$1.lst

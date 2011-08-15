@@ -1,0 +1,1664 @@
+<html>
+<title>NEOS Job #797955</title>
+
+<BODY BGCOLOR='#ffffff'>
+<center>
+<a href ="http://neos.mcs.anl.gov/neos" >
+<img src="http://neos.mcs.anl.gov/neos/images/globe_small.jpg"
+alt="NEOS Server Home" border=0></a></center>
+<P><hr><br>
+<PRE>
+*************************************************************
+
+   NEOS Server Version 5.0
+   Job#     : 797955
+   Password : cxEJDoef
+   Solver   : go:BARON:GAMS
+   Start    : 2006-06-29 23:09:32
+   End      : 2006-06-29 23:09:34
+   Host     : link.mcs.anl.gov
+
+   Disclaimer:
+
+   This information is provided without any express or
+   implied warranty. In particular, there is no warranty
+   of any kind concerning the fitness of this
+   information  for any particular purpose.
+
+*************************************************************
+GAMS Rev 143  Intel/Linux                              06/29/06 23:09:33 Page 1
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+   1  Scalar
+   2      c0      'cost per bundle'                                            
+             /20/
+   3      M       'max number of output coils that can be processed in one mont
+      h'     /10/
+   4      L       'amount lost each time an input coil is cut'                 
+             /1/;
+   5   
+   6  Sets
+   7      i       'number of input coils'                         /1*2/
+   8      j       'number of output coils'                        /1*3/
+   9      h       'number of input coils of type i purchased'     /1*20/
+  10      t       'number of periods we consider'                 /1*3/
+  11      s       'output coil size'                              /small, mediu
+      m, large/
+  12      a(j)    'number for small output coils'                 /1*1/
+  13      b(j)    'number for medium output coils'                /2*2/
+  14      k(j)    'number for large output coils'                 /3*3/
+  15      small(s)  'small size'                                  /small/
+  16      medium(s) 'medium size'                                 /medium/
+  17      large(s)  'large size'                                  /large/;
+  18   
+  19  Parameters
+  20  IW(i) Input Coil Widths
+  21       /1         3
+  22        2         0/
+  23   
+  24  c(i) Input Coil Costs
+  25       /1         5
+  26        2        15/
+  27   
+  28  n(i) Input Coil per Bundle
+  29       /1        2
+  30        2        1/
+  31   
+  32  OW(j) Output Coil Widths
+  33       /1         2
+  34        2         3
+  35        3        30/
+  36   
+  37  P(j)  Product coil Price
+  38       /1        10
+  39        2        20
+  40        3        40/
+  41   
+  42  Cap(i) The inventory capacity for each input coil
+  43       /1        30
+  44        2        20/
+  45   
+  46  O(s) inventory capacity for output coil
+  47      /small       50
+  48       medium      60
+  49       large       40/
+  50   
+  51  Table d(j,t) Expected Demand
+  52           1         2           3
+  53  1       10         0           0
+  54  2        0        20           0
+  55  3        0         0           0;
+  56   
+  57   
+  58  Variables
+  59  x(i,t)        'number of input coil i purchased in month t'
+  60  y(i,h,j,t)    'number of output coil j produced by input coil i in month 
+      t'
+  61  sold(j,t)     'number of output coil j sold in month t'
+  62  r(i,t)        'total number of unused input coil i in month t'
+  63  Out(j,t)      'number of inventory for type j output coil from month t'
+  64  In(i,t)       'number of inventory for type i input coil from month t'
+  65  BP(t)         'number of bundles purchased in month t'
+  66  v(i,t)        'number of individual input coil i purchased in month t'
+  67  count(i,h,t)
+  68  z total profit;
+  69   
+  70  binary variables
+  71  count;
+  72   
+  73  integer variables
+  74  x
+  75  y
+  76  sold
+  77  BP
+  78  r
+  79  In
+  80  Out
+  81  v;
+  82   
+  83  Equations
+  84  profit              the objective function
+  85  totOut(t)      the total output constraint
+  86  cut(i,t)            the cutting constraint
+  87  inputLimA(i,t)     the process for the input constraint
+  88  inputLimB(i,t)     the limit for the input inventory
+  89  storageA(j,t)
+  90  storageB(i,t)
+  91  storageS(small,t)
+  92  storageM(medium,t)
+  93  storageL(large,t)
+  94  orderA(j,t)
+  95  orderB(j,t)
+  96  chckWdth(i,j,h,t)
+  97  chckShve(i,j,t)
+  98  chckWste(i,h,t)
+  99  blahA(i,h,t)
+ 100  blahB(i,h,t)
+ 101  blahC(i,t)
+ 102  bundle(i,t)         the bundle constraint;
+ 103   
+ 104  *------------------
+ 105  * Set upper bounds
+ 106  *------------------
+ 107  x.up(i,t) = 1000000;
+ 108  y.up(i,h,j,t) = 1000000;
+ 109  sold.up(j,t) = d(j,t);
+ 110  r.up(i,t) = 1000000;
+ 111  BP.up(t) = 1000000;
+ 112  v.up(i,t) = 1000000;
+ 113   
+ 114  *------------------
+ 115  * Set lower bounds
+ 116  *------------------
+ 117  In.lo(i,t) = 0;
+ 118  Out.lo(j,t) = 0;
+ 119  r.lo(i,t) = 0;
+ 120  sold.lo(j,t) = 0;
+ 121  v.lo(i,t) = 0;
+ 122  BP.lo(t) = 0;
+ 123  x.lo(i,t) = 0;
+ 124  y.lo(i,h,j,t) = 0;
+ 125   
+ 126  *-----------
+ 127  * Equations
+ 128  *-----------
+ 129  profit .. z =e= sum(t, sum(j,P(j)*sold(j,t))- BP(t)*c0 - sum(i,v(i,t)*c(i
+      )));
+ 130   
+ 131  totOut(t) .. sum((i,j,h),y(i,h,j,t)) =l= M;
+ 132   
+ 133  cut(i,t) .. (In(i,t-1) + x(i,t))*IW(i) =g= sum ((j,h), OW(j)*y(i,h,j,t)) 
+      + (sum((j,h), y(i,h,j,t)$(IW(i) - OW(j) gt L)) -x(i,t))*L + r(i,t)*IW(i);
+ 134   
+ 135  chckWste(i,h,t).. IW(i) =g= sum(j, y(i,h,j,t)*OW(j)) + (sum(j, y(i,h,j,t)
+      )-1)*L;
+ 136   
+ 137  storageA(j,t) .. Out(j,t-1) + sum((i,h), y(i,h,j,t)) - sold(j,t) =g= Out(
+      j,t);
+ 138  storageB(i,t) .. r(i,t) =g= In(i,t);
+ 139   
+ 140  storageS(small,t) .. sum(a(j), Out(j,t)) =l= O(small);
+ 141  storageM(medium,t) .. sum(b(j), Out(j,t)) =l= O(medium);
+ 142  storageL(large,t) .. sum(k(j), Out(j,t)) =l= O(large);
+ 143   
+ 144  orderA(j,t) .. Out(j,t-1) + sum((i,h), y(i,h,j,t)) =g= sold(j,t);
+ 145  orderB(j,t) .. sold(j,t) =l= d(j,t);
+ 146   
+ 147  inputLimA(i,t) .. In(i,t) =l= Cap(i);
+ 148   
+ 149  inputLimB(i,t) .. r(i,t) =l= x(i,t) + In(i, t-1);
+ 150   
+ 151  bundle(i,t) .. BP(t)*n(i) + v(i,t) =e= x(i,t);
+ 152   
+ 153  chckWdth(i,j,h,t) .. y(i,h,j,t)$(OW(j) ge IW(i)+1) =e= 0;
+ 154   
+ 155  chckShve(i,j,t) .. sum(h, y(i,h,j,t))$(IW(i) - OW(j) le L) =l= In(i,t-1) 
+      + x(i,t);
+ 156   
+ 157  blahA(i,h,t) .. sum(j, y(i,h,j,t)) =l= 10000001*count(i,h,t);
+ 158  blahB(i,h,t) .. sum(j, y(i,h,j,t)) =g= count(i,h,t);
+ 159  blahC(i,t) .. sum(h, count(i,h,t)) + r(i,t) =e= In(i,t-1) + x(i,t);
+ 160   
+ 161  Model coil /all/;
+ 162  coil.optfile = 1;
+ 163   
+ 164  Solve coil using mip maximizing z;
+
+
+COMPILATION TIME     =        0.002 SECONDS      3 Mb  LNX220-143 Jul 27, 2005
+GAMS Rev 143  Intel/Linux                              06/29/06 23:09:33 Page 2
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Model Statistics    SOLVE coil Using MIP From line 164
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          19     SINGLE EQUATIONS          694
+BLOCKS OF VARIABLES          10     SINGLE VARIABLES          526
+NON ZERO ELEMENTS         3,665     DISCRETE VARIABLES        518
+
+
+GENERATION TIME      =        0.017 SECONDS      4 Mb  LNX220-143 Jul 27, 2005
+
+
+EXECUTION TIME       =        0.018 SECONDS      4 Mb  LNX220-143 Jul 27, 2005
+GAMS Rev 143  Intel/Linux                              06/29/06 23:09:33 Page 3
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Solution Report     SOLVE coil Using MIP From line 164
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   coil                OBJECTIVE  z
+     TYPE    MIP                 DIRECTION  MAXIMIZE
+     SOLVER  BARON               FROM LINE  164
+
+**** SOLVER STATUS     1 NORMAL COMPLETION         
+**** MODEL STATUS      1 OPTIMAL                   
+**** OBJECTIVE VALUE              325.0000
+
+ RESOURCE USAGE, LIMIT          0.090      1000.000
+ ITERATION COUNT, LIMIT         0         10000
+
+Baron 7.2.5   Aug  1, 2005 LNX.BA.NA 22.0 009.000.000.LX3 P3PC             
+
+Branch And Reduce Optimization Navigator
+Nikolaos Sahinidis and Mohit Tawarmalani
+The Optimization Firm, LLC.
+
+Using option file /nfs/mcs-homes64/neosotc/.neos5/jobs/797955/baron.opt
+    &gt; cutoff 4.9975 
+    &gt; epsa 0
+    &gt; numloc -1
+
+  Total time elapsed   :     000:00:00,    in seconds:          0.10
+       on parsing      :     000:00:00,    in seconds:          0.07
+       on preprocessing:     000:00:00,    in seconds:          0.03
+       on navigating   :     000:00:00,    in seconds:          0.00
+       on relaxed      :     000:00:00,    in seconds:          0.00
+       on local        :     000:00:00,    in seconds:          0.00
+       on tightening   :     000:00:00,    in seconds:          0.00
+       on marginals    :     000:00:00,    in seconds:          0.00
+       on probing      :     000:00:00,    in seconds:          0.00
+
+   Total no. of BaR iterations:      -1
+   Best solution found at node:      -1
+   Max. no. of nodes in memory:       0
+ 
+
+Solution      = 325  best solution found during preprocessing
+Best possible = 325
+Absolute gap  = 0  optca = 0
+Relative gap  = 0  optcr = 0.1
+
+
+                       LOWER     LEVEL     UPPER    MARGINAL
+
+---- EQU profit          .         .         .        1.000      
+
+  profit  the objective function
+
+---- EQU totOut  the total output constraint
+
+     LOWER     LEVEL     UPPER    MARGINAL
+
+1     -INF     10.000    10.000      .         
+2     -INF     10.000    10.000      .         
+3     -INF       .       10.000      .         
+
+---- EQU cut  the cutting constraint
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .        +INF       .         
+1.2      .         .        +INF       .         
+1.3      .         .        +INF       .         
+2.1      .         .        +INF       .         
+2.2      .         .        +INF       .         
+2.3      .         .        +INF       .         
+
+---- EQU inputLimA  the process for the input constraint
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1     -INF     10.000    30.000      .         
+1.2     -INF       .       30.000      .         
+1.3     -INF       .       30.000      .         
+2.1     -INF       .       20.000      .         
+2.2     -INF       .       20.000      .         
+2.3     -INF       .       20.000      .         
+
+---- EQU inputLimB  the limit for the input inventory
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1     -INF     -5.000      .         .         
+1.2     -INF    -10.000      .         .         
+1.3     -INF       .         .         .         
+2.1     -INF       .         .         .         
+2.2     -INF       .         .         .         
+2.3     -INF       .         .         .         
+
+---- EQU storageA  
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .        +INF       .         
+1.2      .         .        +INF       .         
+1.3      .         .        +INF       .         
+2.1      .         .        +INF       .         
+2.2      .         .        +INF       .         
+2.3      .         .        +INF       .         
+3.1      .         .        +INF       .         
+3.2      .         .        +INF       .         
+3.3      .         .        +INF       .         
+
+---- EQU storageB  
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .        +INF       .         
+1.2      .         .        +INF       .         
+1.3      .         .        +INF       .         
+2.1      .         .        +INF       .         
+2.2      .         .        +INF       .         
+2.3      .         .        +INF       .         
+
+---- EQU storageS  
+
+           LOWER     LEVEL     UPPER    MARGINAL
+
+small.1     -INF       .       50.000      .         
+small.2     -INF       .       50.000      .         
+small.3     -INF       .       50.000      .         
+
+---- EQU storageM  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+medium.1     -INF     10.000    60.000      .         
+medium.2     -INF       .       60.000      .         
+medium.3     -INF       .       60.000      .         
+
+---- EQU storageL  
+
+           LOWER     LEVEL     UPPER    MARGINAL
+
+large.1     -INF       .       40.000      .         
+large.2     -INF       .       40.000      .         
+large.3     -INF       .       40.000      .         
+
+---- EQU orderA  
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .        +INF       .         
+1.2      .         .        +INF       .         
+1.3      .         .        +INF       .         
+2.1      .       10.000     +INF       .         
+2.2      .         .        +INF       .         
+2.3      .         .        +INF       .         
+3.1      .         .        +INF       .         
+3.2      .         .        +INF       .         
+3.3      .         .        +INF       .         
+
+---- EQU orderB  
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1     -INF       .       10.000      .         
+1.2     -INF       .         .         .         
+1.3     -INF       .         .         .         
+2.1     -INF       .         .         .         
+2.2     -INF     20.000    20.000      .         
+2.3     -INF       .         .         .         
+3.1     -INF       .         .         .         
+3.2     -INF       .         .         .         
+3.3     -INF       .         .         .         
+
+---- EQU chckWdth  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+1.3.1 .1      .         .         .         .         
+1.3.1 .2      .         .         .         .         
+1.3.1 .3      .         .         .         .         
+1.3.2 .1      .         .         .         .         
+1.3.2 .2      .         .         .         .         
+1.3.2 .3      .         .         .         .         
+1.3.3 .1      .         .         .         .         
+1.3.3 .2      .         .         .         .         
+1.3.3 .3      .         .         .         .         
+1.3.4 .1      .         .         .         .         
+1.3.4 .2      .         .         .         .         
+1.3.4 .3      .         .         .         .         
+1.3.5 .1      .         .         .         .         
+1.3.5 .2      .         .         .         .         
+1.3.5 .3      .         .         .         .         
+1.3.6 .1      .         .         .         .         
+1.3.6 .2      .         .         .         .         
+1.3.6 .3      .         .         .         .         
+1.3.7 .1      .         .         .         .         
+1.3.7 .2      .         .         .         .         
+1.3.7 .3      .         .         .         .         
+1.3.8 .1      .         .         .         .         
+1.3.8 .2      .         .         .         .         
+1.3.8 .3      .         .         .         .         
+1.3.9 .1      .         .         .         .         
+1.3.9 .2      .         .         .         .         
+1.3.9 .3      .         .         .         .         
+1.3.10.1      .         .         .         .         
+1.3.10.2      .         .         .         .         
+1.3.10.3      .         .         .         .         
+1.3.11.1      .         .         .         .         
+1.3.11.2      .         .         .         .         
+1.3.11.3      .         .         .         .         
+1.3.12.1      .         .         .         .         
+1.3.12.2      .         .         .         .         
+1.3.12.3      .         .         .         .         
+1.3.13.1      .         .         .         .         
+1.3.13.2      .         .         .         .         
+1.3.13.3      .         .         .         .         
+1.3.14.1      .         .         .         .         
+1.3.14.2      .         .         .         .         
+1.3.14.3      .         .         .         .         
+1.3.15.1      .         .         .         .         
+1.3.15.2      .         .         .         .         
+1.3.15.3      .         .         .         .         
+1.3.16.1      .         .         .         .         
+1.3.16.2      .         .         .         .         
+1.3.16.3      .         .         .         .         
+1.3.17.1      .         .         .         .         
+1.3.17.2      .         .         .         .         
+1.3.17.3      .         .         .         .         
+1.3.18.1      .         .         .         .         
+1.3.18.2      .         .         .         .         
+1.3.18.3      .         .         .         .         
+1.3.19.1      .         .         .         .         
+1.3.19.2      .         .         .         .         
+1.3.19.3      .         .         .         .         
+1.3.20.1      .         .         .         .         
+1.3.20.2      .         .         .         .         
+1.3.20.3      .         .         .         .         
+2.1.1 .1      .         .         .         .         
+2.1.1 .2      .         .         .         .         
+2.1.1 .3      .         .         .         .         
+2.1.2 .1      .         .         .         .         
+2.1.2 .2      .         .         .         .         
+2.1.2 .3      .         .         .         .         
+2.1.3 .1      .         .         .         .         
+2.1.3 .2      .         .         .         .         
+2.1.3 .3      .         .         .         .         
+2.1.4 .1      .         .         .         .         
+2.1.4 .2      .         .         .         .         
+2.1.4 .3      .         .         .         .         
+2.1.5 .1      .         .         .         .         
+2.1.5 .2      .         .         .         .         
+2.1.5 .3      .         .         .         .         
+2.1.6 .1      .         .         .         .         
+2.1.6 .2      .         .         .         .         
+2.1.6 .3      .         .         .         .         
+2.1.7 .1      .         .         .         .         
+2.1.7 .2      .         .         .         .         
+2.1.7 .3      .         .         .         .         
+2.1.8 .1      .         .         .         .         
+2.1.8 .2      .         .         .         .         
+2.1.8 .3      .         .         .         .         
+2.1.9 .1      .         .         .         .         
+2.1.9 .2      .         .         .         .         
+2.1.9 .3      .         .         .         .         
+2.1.10.1      .         .         .         .         
+2.1.10.2      .         .         .         .         
+2.1.10.3      .         .         .         .         
+2.1.11.1      .         .         .         .         
+2.1.11.2      .         .         .         .         
+2.1.11.3      .         .         .         .         
+2.1.12.1      .         .         .         .         
+2.1.12.2      .         .         .         .         
+2.1.12.3      .         .         .         .         
+2.1.13.1      .         .         .         .         
+2.1.13.2      .         .         .         .         
+2.1.13.3      .         .         .         .         
+2.1.14.1      .         .         .         .         
+2.1.14.2      .         .         .         .         
+2.1.14.3      .         .         .         .         
+2.1.15.1      .         .         .         .         
+2.1.15.2      .         .         .         .         
+2.1.15.3      .         .         .         .         
+2.1.16.1      .         .         .         .         
+2.1.16.2      .         .         .         .         
+2.1.16.3      .         .         .         .         
+2.1.17.1      .         .         .         .         
+2.1.17.2      .         .         .         .         
+2.1.17.3      .         .         .         .         
+2.1.18.1      .         .         .         .         
+2.1.18.2      .         .         .         .         
+2.1.18.3      .         .         .         .         
+2.1.19.1      .         .         .         .         
+2.1.19.2      .         .         .         .         
+2.1.19.3      .         .         .         .         
+2.1.20.1      .         .         .         .         
+2.1.20.2      .         .         .         .         
+2.1.20.3      .         .         .         .         
+2.2.1 .1      .         .         .         .         
+2.2.1 .2      .         .         .         .         
+2.2.1 .3      .         .         .         .         
+2.2.2 .1      .         .         .         .         
+2.2.2 .2      .         .         .         .         
+2.2.2 .3      .         .         .         .         
+2.2.3 .1      .         .         .         .         
+2.2.3 .2      .         .         .         .         
+2.2.3 .3      .         .         .         .         
+2.2.4 .1      .         .         .         .         
+2.2.4 .2      .         .         .         .         
+2.2.4 .3      .         .         .         .         
+2.2.5 .1      .         .         .         .         
+2.2.5 .2      .         .         .         .         
+2.2.5 .3      .         .         .         .         
+2.2.6 .1      .         .         .         .         
+2.2.6 .2      .         .         .         .         
+2.2.6 .3      .         .         .         .         
+2.2.7 .1      .         .         .         .         
+2.2.7 .2      .         .         .         .         
+2.2.7 .3      .         .         .         .         
+2.2.8 .1      .         .         .         .         
+2.2.8 .2      .         .         .         .         
+2.2.8 .3      .         .         .         .         
+2.2.9 .1      .         .         .         .         
+2.2.9 .2      .         .         .         .         
+2.2.9 .3      .         .         .         .         
+2.2.10.1      .         .         .         .         
+2.2.10.2      .         .         .         .         
+2.2.10.3      .         .         .         .         
+2.2.11.1      .         .         .         .         
+2.2.11.2      .         .         .         .         
+2.2.11.3      .         .         .         .         
+2.2.12.1      .         .         .         .         
+2.2.12.2      .         .         .         .         
+2.2.12.3      .         .         .         .         
+2.2.13.1      .         .         .         .         
+2.2.13.2      .         .         .         .         
+2.2.13.3      .         .         .         .         
+2.2.14.1      .         .         .         .         
+2.2.14.2      .         .         .         .         
+2.2.14.3      .         .         .         .         
+2.2.15.1      .         .         .         .         
+2.2.15.2      .         .         .         .         
+2.2.15.3      .         .         .         .         
+2.2.16.1      .         .         .         .         
+2.2.16.2      .         .         .         .         
+2.2.16.3      .         .         .         .         
+2.2.17.1      .         .         .         .         
+2.2.17.2      .         .         .         .         
+2.2.17.3      .         .         .         .         
+2.2.18.1      .         .         .         .         
+2.2.18.2      .         .         .         .         
+2.2.18.3      .         .         .         .         
+2.2.19.1      .         .         .         .         
+2.2.19.2      .         .         .         .         
+2.2.19.3      .         .         .         .         
+2.2.20.1      .         .         .         .         
+2.2.20.2      .         .         .         .         
+2.2.20.3      .         .         .         .         
+2.3.1 .1      .         .         .         .         
+2.3.1 .2      .         .         .         .         
+2.3.1 .3      .         .         .         .         
+2.3.2 .1      .         .         .         .         
+2.3.2 .2      .         .         .         .         
+2.3.2 .3      .         .         .         .         
+2.3.3 .1      .         .         .         .         
+2.3.3 .2      .         .         .         .         
+2.3.3 .3      .         .         .         .         
+2.3.4 .1      .         .         .         .         
+2.3.4 .2      .         .         .         .         
+2.3.4 .3      .         .         .         .         
+2.3.5 .1      .         .         .         .         
+2.3.5 .2      .         .         .         .         
+2.3.5 .3      .         .         .         .         
+2.3.6 .1      .         .         .         .         
+2.3.6 .2      .         .         .         .         
+2.3.6 .3      .         .         .         .         
+2.3.7 .1      .         .         .         .         
+2.3.7 .2      .         .         .         .         
+2.3.7 .3      .         .         .         .         
+2.3.8 .1      .         .         .         .         
+2.3.8 .2      .         .         .         .         
+2.3.8 .3      .         .         .         .         
+2.3.9 .1      .         .         .         .         
+2.3.9 .2      .         .         .         .         
+2.3.9 .3      .         .         .         .         
+2.3.10.1      .         .         .         .         
+2.3.10.2      .         .         .         .         
+2.3.10.3      .         .         .         .         
+2.3.11.1      .         .         .         .         
+2.3.11.2      .         .         .         .         
+2.3.11.3      .         .         .         .         
+2.3.12.1      .         .         .         .         
+2.3.12.2      .         .         .         .         
+2.3.12.3      .         .         .         .         
+2.3.13.1      .         .         .         .         
+2.3.13.2      .         .         .         .         
+2.3.13.3      .         .         .         .         
+2.3.14.1      .         .         .         .         
+2.3.14.2      .         .         .         .         
+2.3.14.3      .         .         .         .         
+2.3.15.1      .         .         .         .         
+2.3.15.2      .         .         .         .         
+2.3.15.3      .         .         .         .         
+2.3.16.1      .         .         .         .         
+2.3.16.2      .         .         .         .         
+2.3.16.3      .         .         .         .         
+2.3.17.1      .         .         .         .         
+2.3.17.2      .         .         .         .         
+2.3.17.3      .         .         .         .         
+2.3.18.1      .         .         .         .         
+2.3.18.2      .         .         .         .         
+2.3.18.3      .         .         .         .         
+2.3.19.1      .         .         .         .         
+2.3.19.2      .         .         .         .         
+2.3.19.3      .         .         .         .         
+2.3.20.1      .         .         .         .         
+2.3.20.2      .         .         .         .         
+2.3.20.3      .         .         .         .         
+
+---- EQU chckShve  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+1.1.1     -INF    -15.000      .         .         
+1.1.2     -INF    -10.000      .         .         
+1.1.3     -INF       .         .         .         
+1.2.1     -INF     -5.000      .         .         
+1.2.2     -INF       .         .         .         
+1.2.3     -INF       .         .         .         
+1.3.1     -INF    -15.000      .         .         
+1.3.2     -INF    -10.000      .         .         
+1.3.3     -INF       .         .         .         
+2.1.1     -INF       .         .         .         
+2.1.2     -INF       .         .         .         
+2.1.3     -INF       .         .         .         
+2.2.1     -INF       .         .         .         
+2.2.2     -INF       .         .         .         
+2.2.3     -INF       .         .         .         
+2.3.1     -INF       .         .         .         
+2.3.2     -INF       .         .         .         
+2.3.3     -INF       .         .         .         
+
+---- EQU chckWste  
+
+          LOWER     LEVEL     UPPER    MARGINAL
+
+1.1 .1    -4.000    -4.000     +INF       .         
+1.1 .2    -4.000    -4.000     +INF       .         
+1.1 .3    -4.000      .        +INF       .         
+1.2 .1    -4.000    -4.000     +INF       .         
+1.2 .2    -4.000    -4.000     +INF       .         
+1.2 .3    -4.000      .        +INF       .         
+1.3 .1    -4.000    -4.000     +INF       .         
+1.3 .2    -4.000    -4.000     +INF       .         
+1.3 .3    -4.000      .        +INF       .         
+1.4 .1    -4.000    -4.000     +INF       .         
+1.4 .2    -4.000    -4.000     +INF       .         
+1.4 .3    -4.000      .        +INF       .         
+1.5 .1    -4.000    -4.000     +INF       .         
+1.5 .2    -4.000    -4.000     +INF       .         
+1.5 .3    -4.000      .        +INF       .         
+1.6 .1    -4.000    -4.000     +INF       .         
+1.6 .2    -4.000    -4.000     +INF       .         
+1.6 .3    -4.000      .        +INF       .         
+1.7 .1    -4.000    -4.000     +INF       .         
+1.7 .2    -4.000    -4.000     +INF       .         
+1.7 .3    -4.000      .        +INF       .         
+1.8 .1    -4.000    -4.000     +INF       .         
+1.8 .2    -4.000    -4.000     +INF       .         
+1.8 .3    -4.000      .        +INF       .         
+1.9 .1    -4.000    -4.000     +INF       .         
+1.9 .2    -4.000    -4.000     +INF       .         
+1.9 .3    -4.000      .        +INF       .         
+1.10.1    -4.000      .        +INF       .         
+1.10.2    -4.000      .        +INF       .         
+1.10.3    -4.000      .        +INF       .         
+1.11.1    -4.000      .        +INF       .         
+1.11.2    -4.000      .        +INF       .         
+1.11.3    -4.000      .        +INF       .         
+1.12.1    -4.000      .        +INF       .         
+1.12.2    -4.000      .        +INF       .         
+1.12.3    -4.000      .        +INF       .         
+1.13.1    -4.000      .        +INF       .         
+1.13.2    -4.000      .        +INF       .         
+1.13.3    -4.000      .        +INF       .         
+1.14.1    -4.000      .        +INF       .         
+1.14.2    -4.000      .        +INF       .         
+1.14.3    -4.000      .        +INF       .         
+1.15.1    -4.000      .        +INF       .         
+1.15.2    -4.000      .        +INF       .         
+1.15.3    -4.000      .        +INF       .         
+1.16.1    -4.000      .        +INF       .         
+1.16.2    -4.000      .        +INF       .         
+1.16.3    -4.000      .        +INF       .         
+1.17.1    -4.000      .        +INF       .         
+1.17.2    -4.000      .        +INF       .         
+1.17.3    -4.000      .        +INF       .         
+1.18.1    -4.000      .        +INF       .         
+1.18.2    -4.000      .        +INF       .         
+1.18.3    -4.000      .        +INF       .         
+1.19.1    -4.000      .        +INF       .         
+1.19.2    -4.000      .        +INF       .         
+1.19.3    -4.000      .        +INF       .         
+1.20.1    -4.000    -4.000     +INF       .         
+1.20.2    -4.000    -4.000     +INF       .         
+1.20.3    -4.000      .        +INF       .         
+2.1 .1    -1.000      .        +INF       .         
+2.1 .2    -1.000      .        +INF       .         
+2.1 .3    -1.000      .        +INF       .         
+2.2 .1    -1.000      .        +INF       .         
+2.2 .2    -1.000      .        +INF       .         
+2.2 .3    -1.000      .        +INF       .         
+2.3 .1    -1.000      .        +INF       .         
+2.3 .2    -1.000      .        +INF       .         
+2.3 .3    -1.000      .        +INF       .         
+2.4 .1    -1.000      .        +INF       .         
+2.4 .2    -1.000      .        +INF       .         
+2.4 .3    -1.000      .        +INF       .         
+2.5 .1    -1.000      .        +INF       .         
+2.5 .2    -1.000      .        +INF       .         
+2.5 .3    -1.000      .        +INF       .         
+2.6 .1    -1.000      .        +INF       .         
+2.6 .2    -1.000      .        +INF       .         
+2.6 .3    -1.000      .        +INF       .         
+2.7 .1    -1.000      .        +INF       .         
+2.7 .2    -1.000      .        +INF       .         
+2.7 .3    -1.000      .        +INF       .         
+2.8 .1    -1.000      .        +INF       .         
+2.8 .2    -1.000      .        +INF       .         
+2.8 .3    -1.000      .        +INF       .         
+2.9 .1    -1.000      .        +INF       .         
+2.9 .2    -1.000      .        +INF       .         
+2.9 .3    -1.000      .        +INF       .         
+2.10.1    -1.000      .        +INF       .         
+2.10.2    -1.000      .        +INF       .         
+2.10.3    -1.000      .        +INF       .         
+2.11.1    -1.000      .        +INF       .         
+2.11.2    -1.000      .        +INF       .         
+2.11.3    -1.000      .        +INF       .         
+2.12.1    -1.000      .        +INF       .         
+2.12.2    -1.000      .        +INF       .         
+2.12.3    -1.000      .        +INF       .         
+2.13.1    -1.000      .        +INF       .         
+2.13.2    -1.000      .        +INF       .         
+2.13.3    -1.000      .        +INF       .         
+2.14.1    -1.000      .        +INF       .         
+2.14.2    -1.000      .        +INF       .         
+2.14.3    -1.000      .        +INF       .         
+2.15.1    -1.000      .        +INF       .         
+2.15.2    -1.000      .        +INF       .         
+2.15.3    -1.000      .        +INF       .         
+2.16.1    -1.000      .        +INF       .         
+2.16.2    -1.000      .        +INF       .         
+2.16.3    -1.000      .        +INF       .         
+2.17.1    -1.000      .        +INF       .         
+2.17.2    -1.000      .        +INF       .         
+2.17.3    -1.000      .        +INF       .         
+2.18.1    -1.000      .        +INF       .         
+2.18.2    -1.000      .        +INF       .         
+2.18.3    -1.000      .        +INF       .         
+2.19.1    -1.000      .        +INF       .         
+2.19.2    -1.000      .        +INF       .         
+2.19.3    -1.000      .        +INF       .         
+2.20.1    -1.000      .        +INF       .         
+2.20.2    -1.000      .        +INF       .         
+2.20.3    -1.000      .        +INF       .         
+
+---- EQU blahA  
+
+          LOWER     LEVEL     UPPER    MARGINAL
+
+1.1 .1     -INF  -1.000E+7      .         .         
+1.1 .2     -INF  -1.000E+7      .         .         
+1.1 .3     -INF       .         .         .         
+1.2 .1     -INF  -1.000E+7      .         .         
+1.2 .2     -INF  -1.000E+7      .         .         
+1.2 .3     -INF       .         .         .         
+1.3 .1     -INF  -1.000E+7      .         .         
+1.3 .2     -INF  -1.000E+7      .         .         
+1.3 .3     -INF       .         .         .         
+1.4 .1     -INF  -1.000E+7      .         .         
+1.4 .2     -INF  -1.000E+7      .         .         
+1.4 .3     -INF       .         .         .         
+1.5 .1     -INF  -1.000E+7      .         .         
+1.5 .2     -INF  -1.000E+7      .         .         
+1.5 .3     -INF       .         .         .         
+1.6 .1     -INF       .         .         .         
+1.6 .2     -INF  -1.000E+7      .         .         
+1.6 .3     -INF       .         .         .         
+1.7 .1     -INF       .         .         .         
+1.7 .2     -INF  -1.000E+7      .         .         
+1.7 .3     -INF       .         .         .         
+1.8 .1     -INF       .         .         .         
+1.8 .2     -INF  -1.000E+7      .         .         
+1.8 .3     -INF       .         .         .         
+1.9 .1     -INF       .         .         .         
+1.9 .2     -INF  -1.000E+7      .         .         
+1.9 .3     -INF       .         .         .         
+1.10.1     -INF       .         .         .         
+1.10.2     -INF       .         .         .         
+1.10.3     -INF       .         .         .         
+1.11.1     -INF       .         .         .         
+1.11.2     -INF       .         .         .         
+1.11.3     -INF       .         .         .         
+1.12.1     -INF       .         .         .         
+1.12.2     -INF       .         .         .         
+1.12.3     -INF       .         .         .         
+1.13.1     -INF       .         .         .         
+1.13.2     -INF       .         .         .         
+1.13.3     -INF       .         .         .         
+1.14.1     -INF       .         .         .         
+1.14.2     -INF       .         .         .         
+1.14.3     -INF       .         .         .         
+1.15.1     -INF       .         .         .         
+1.15.2     -INF       .         .         .         
+1.15.3     -INF       .         .         .         
+1.16.1     -INF       .         .         .         
+1.16.2     -INF       .         .         .         
+1.16.3     -INF       .         .         .         
+1.17.1     -INF       .         .         .         
+1.17.2     -INF       .         .         .         
+1.17.3     -INF       .         .         .         
+1.18.1     -INF       .         .         .         
+1.18.2     -INF       .         .         .         
+1.18.3     -INF       .         .         .         
+1.19.1     -INF       .         .         .         
+1.19.2     -INF       .         .         .         
+1.19.3     -INF       .         .         .         
+1.20.1     -INF       .         .         .         
+1.20.2     -INF  -1.000E+7      .         .         
+1.20.3     -INF       .         .         .         
+2.1 .1     -INF       .         .         .         
+2.1 .2     -INF       .         .         .         
+2.1 .3     -INF       .         .         .         
+2.2 .1     -INF       .         .         .         
+2.2 .2     -INF       .         .         .         
+2.2 .3     -INF       .         .         .         
+2.3 .1     -INF       .         .         .         
+2.3 .2     -INF       .         .         .         
+2.3 .3     -INF       .         .         .         
+2.4 .1     -INF       .         .         .         
+2.4 .2     -INF       .         .         .         
+2.4 .3     -INF       .         .         .         
+2.5 .1     -INF       .         .         .         
+2.5 .2     -INF       .         .         .         
+2.5 .3     -INF       .         .         .         
+2.6 .1     -INF       .         .         .         
+2.6 .2     -INF       .         .         .         
+2.6 .3     -INF       .         .         .         
+2.7 .1     -INF       .         .         .         
+2.7 .2     -INF       .         .         .         
+2.7 .3     -INF       .         .         .         
+2.8 .1     -INF       .         .         .         
+2.8 .2     -INF       .         .         .         
+2.8 .3     -INF       .         .         .         
+2.9 .1     -INF       .         .         .         
+2.9 .2     -INF       .         .         .         
+2.9 .3     -INF       .         .         .         
+2.10.1     -INF       .         .         .         
+2.10.2     -INF       .         .         .         
+2.10.3     -INF       .         .         .         
+2.11.1     -INF       .         .         .         
+2.11.2     -INF       .         .         .         
+2.11.3     -INF       .         .         .         
+2.12.1     -INF       .         .         .         
+2.12.2     -INF       .         .         .         
+2.12.3     -INF       .         .         .         
+2.13.1     -INF       .         .         .         
+2.13.2     -INF       .         .         .         
+2.13.3     -INF       .         .         .         
+2.14.1     -INF       .         .         .         
+2.14.2     -INF       .         .         .         
+2.14.3     -INF       .         .         .         
+2.15.1     -INF       .         .         .         
+2.15.2     -INF       .         .         .         
+2.15.3     -INF       .         .         .         
+2.16.1     -INF       .         .         .         
+2.16.2     -INF       .         .         .         
+2.16.3     -INF       .         .         .         
+2.17.1     -INF       .         .         .         
+2.17.2     -INF       .         .         .         
+2.17.3     -INF       .         .         .         
+2.18.1     -INF       .         .         .         
+2.18.2     -INF       .         .         .         
+2.18.3     -INF       .         .         .         
+2.19.1     -INF       .         .         .         
+2.19.2     -INF       .         .         .         
+2.19.3     -INF       .         .         .         
+2.20.1     -INF       .         .         .         
+2.20.2     -INF       .         .         .         
+2.20.3     -INF       .         .         .         
+
+---- EQU blahB  
+
+          LOWER     LEVEL     UPPER    MARGINAL
+
+1.1 .1      .         .        +INF       .         
+1.1 .2      .         .        +INF       .         
+1.1 .3      .         .        +INF       .         
+1.2 .1      .         .        +INF       .         
+1.2 .2      .         .        +INF       .         
+1.2 .3      .         .        +INF       .         
+1.3 .1      .         .        +INF       .         
+1.3 .2      .         .        +INF       .         
+1.3 .3      .         .        +INF       .         
+1.4 .1      .         .        +INF       .         
+1.4 .2      .         .        +INF       .         
+1.4 .3      .         .        +INF       .         
+1.5 .1      .         .        +INF       .         
+1.5 .2      .         .        +INF       .         
+1.5 .3      .         .        +INF       .         
+1.6 .1      .        1.000     +INF       .         
+1.6 .2      .         .        +INF       .         
+1.6 .3      .         .        +INF       .         
+1.7 .1      .        1.000     +INF       .         
+1.7 .2      .         .        +INF       .         
+1.7 .3      .         .        +INF       .         
+1.8 .1      .        1.000     +INF       .         
+1.8 .2      .         .        +INF       .         
+1.8 .3      .         .        +INF       .         
+1.9 .1      .        1.000     +INF       .         
+1.9 .2      .         .        +INF       .         
+1.9 .3      .         .        +INF       .         
+1.10.1      .         .        +INF       .         
+1.10.2      .         .        +INF       .         
+1.10.3      .         .        +INF       .         
+1.11.1      .         .        +INF       .         
+1.11.2      .         .        +INF       .         
+1.11.3      .         .        +INF       .         
+1.12.1      .         .        +INF       .         
+1.12.2      .         .        +INF       .         
+1.12.3      .         .        +INF       .         
+1.13.1      .         .        +INF       .         
+1.13.2      .         .        +INF       .         
+1.13.3      .         .        +INF       .         
+1.14.1      .         .        +INF       .         
+1.14.2      .         .        +INF       .         
+1.14.3      .         .        +INF       .         
+1.15.1      .         .        +INF       .         
+1.15.2      .         .        +INF       .         
+1.15.3      .         .        +INF       .         
+1.16.1      .         .        +INF       .         
+1.16.2      .         .        +INF       .         
+1.16.3      .         .        +INF       .         
+1.17.1      .         .        +INF       .         
+1.17.2      .         .        +INF       .         
+1.17.3      .         .        +INF       .         
+1.18.1      .         .        +INF       .         
+1.18.2      .         .        +INF       .         
+1.18.3      .         .        +INF       .         
+1.19.1      .         .        +INF       .         
+1.19.2      .         .        +INF       .         
+1.19.3      .         .        +INF       .         
+1.20.1      .        1.000     +INF       .         
+1.20.2      .         .        +INF       .         
+1.20.3      .         .        +INF       .         
+2.1 .1      .         .        +INF       .         
+2.1 .2      .         .        +INF       .         
+2.1 .3      .         .        +INF       .         
+2.2 .1      .         .        +INF       .         
+2.2 .2      .         .        +INF       .         
+2.2 .3      .         .        +INF       .         
+2.3 .1      .         .        +INF       .         
+2.3 .2      .         .        +INF       .         
+2.3 .3      .         .        +INF       .         
+2.4 .1      .         .        +INF       .         
+2.4 .2      .         .        +INF       .         
+2.4 .3      .         .        +INF       .         
+2.5 .1      .         .        +INF       .         
+2.5 .2      .         .        +INF       .         
+2.5 .3      .         .        +INF       .         
+2.6 .1      .         .        +INF       .         
+2.6 .2      .         .        +INF       .         
+2.6 .3      .         .        +INF       .         
+2.7 .1      .         .        +INF       .         
+2.7 .2      .         .        +INF       .         
+2.7 .3      .         .        +INF       .         
+2.8 .1      .         .        +INF       .         
+2.8 .2      .         .        +INF       .         
+2.8 .3      .         .        +INF       .         
+2.9 .1      .         .        +INF       .         
+2.9 .2      .         .        +INF       .         
+2.9 .3      .         .        +INF       .         
+2.10.1      .         .        +INF       .         
+2.10.2      .         .        +INF       .         
+2.10.3      .         .        +INF       .         
+2.11.1      .         .        +INF       .         
+2.11.2      .         .        +INF       .         
+2.11.3      .         .        +INF       .         
+2.12.1      .         .        +INF       .         
+2.12.2      .         .        +INF       .         
+2.12.3      .         .        +INF       .         
+2.13.1      .         .        +INF       .         
+2.13.2      .         .        +INF       .         
+2.13.3      .         .        +INF       .         
+2.14.1      .         .        +INF       .         
+2.14.2      .         .        +INF       .         
+2.14.3      .         .        +INF       .         
+2.15.1      .         .        +INF       .         
+2.15.2      .         .        +INF       .         
+2.15.3      .         .        +INF       .         
+2.16.1      .         .        +INF       .         
+2.16.2      .         .        +INF       .         
+2.16.3      .         .        +INF       .         
+2.17.1      .         .        +INF       .         
+2.17.2      .         .        +INF       .         
+2.17.3      .         .        +INF       .         
+2.18.1      .         .        +INF       .         
+2.18.2      .         .        +INF       .         
+2.18.3      .         .        +INF       .         
+2.19.1      .         .        +INF       .         
+2.19.2      .         .        +INF       .         
+2.19.3      .         .        +INF       .         
+2.20.1      .         .        +INF       .         
+2.20.2      .         .        +INF       .         
+2.20.3      .         .        +INF       .         
+
+---- EQU blahC  
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .         .         .         
+1.2      .         .         .         .         
+1.3      .         .         .         .         
+2.1      .         .         .         .         
+2.2      .         .         .         .         
+2.3      .         .         .         .         
+
+---- EQU bundle  the bundle constraint
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .         .         .         
+1.2      .         .         .         .         
+1.3      .         .         .         .         
+2.1      .         .         .         .         
+2.2      .         .         .         .         
+2.3      .         .         .         .         
+
+---- VAR x  number of input coil i purchased in month t
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .       15.000 1.0000E+6      EPS       
+1.2      .         .    1.0000E+6      EPS       
+1.3      .         .    1.0000E+6      EPS       
+2.1      .         .    1.0000E+6      EPS       
+2.2      .         .    1.0000E+6      EPS       
+2.3      .         .    1.0000E+6      EPS       
+
+---- VAR y  number of output coil j produced by input coil i in month t
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+1.1 .1.1      .         .    1.0000E+6      EPS       
+1.1 .1.2      .         .    1.0000E+6      EPS       
+1.1 .1.3      .         .    1.0000E+6      EPS       
+1.1 .2.1      .        1.000 1.0000E+6      EPS       
+1.1 .2.2      .        1.000 1.0000E+6      EPS       
+1.1 .2.3      .         .    1.0000E+6      EPS       
+1.1 .3.1      .         .    1.0000E+6      EPS       
+1.1 .3.2      .         .    1.0000E+6      EPS       
+1.1 .3.3      .         .    1.0000E+6      EPS       
+1.2 .1.1      .         .    1.0000E+6      EPS       
+1.2 .1.2      .         .    1.0000E+6      EPS       
+1.2 .1.3      .         .    1.0000E+6      EPS       
+1.2 .2.1      .        1.000 1.0000E+6      EPS       
+1.2 .2.2      .        1.000 1.0000E+6      EPS       
+1.2 .2.3      .         .    1.0000E+6      EPS       
+1.2 .3.1      .         .    1.0000E+6      EPS       
+1.2 .3.2      .         .    1.0000E+6      EPS       
+1.2 .3.3      .         .    1.0000E+6      EPS       
+1.3 .1.1      .         .    1.0000E+6      EPS       
+1.3 .1.2      .         .    1.0000E+6      EPS       
+1.3 .1.3      .         .    1.0000E+6      EPS       
+1.3 .2.1      .        1.000 1.0000E+6      EPS       
+1.3 .2.2      .        1.000 1.0000E+6      EPS       
+1.3 .2.3      .         .    1.0000E+6      EPS       
+1.3 .3.1      .         .    1.0000E+6      EPS       
+1.3 .3.2      .         .    1.0000E+6      EPS       
+1.3 .3.3      .         .    1.0000E+6      EPS       
+1.4 .1.1      .         .    1.0000E+6      EPS       
+1.4 .1.2      .         .    1.0000E+6      EPS       
+1.4 .1.3      .         .    1.0000E+6      EPS       
+1.4 .2.1      .        1.000 1.0000E+6      EPS       
+1.4 .2.2      .        1.000 1.0000E+6      EPS       
+1.4 .2.3      .         .    1.0000E+6      EPS       
+1.4 .3.1      .         .    1.0000E+6      EPS       
+1.4 .3.2      .         .    1.0000E+6      EPS       
+1.4 .3.3      .         .    1.0000E+6      EPS       
+1.5 .1.1      .         .    1.0000E+6      EPS       
+1.5 .1.2      .         .    1.0000E+6      EPS       
+1.5 .1.3      .         .    1.0000E+6      EPS       
+1.5 .2.1      .        1.000 1.0000E+6      EPS       
+1.5 .2.2      .        1.000 1.0000E+6      EPS       
+1.5 .2.3      .         .    1.0000E+6      EPS       
+1.5 .3.1      .         .    1.0000E+6      EPS       
+1.5 .3.2      .         .    1.0000E+6      EPS       
+1.5 .3.3      .         .    1.0000E+6      EPS       
+1.6 .1.1      .         .    1.0000E+6      EPS       
+1.6 .1.2      .         .    1.0000E+6      EPS       
+1.6 .1.3      .         .    1.0000E+6      EPS       
+1.6 .2.1      .        1.000 1.0000E+6      EPS       
+1.6 .2.2      .        1.000 1.0000E+6      EPS       
+1.6 .2.3      .         .    1.0000E+6      EPS       
+1.6 .3.1      .         .    1.0000E+6      EPS       
+1.6 .3.2      .         .    1.0000E+6      EPS       
+1.6 .3.3      .         .    1.0000E+6      EPS       
+1.7 .1.1      .         .    1.0000E+6      EPS       
+1.7 .1.2      .         .    1.0000E+6      EPS       
+1.7 .1.3      .         .    1.0000E+6      EPS       
+1.7 .2.1      .        1.000 1.0000E+6      EPS       
+1.7 .2.2      .        1.000 1.0000E+6      EPS       
+1.7 .2.3      .         .    1.0000E+6      EPS       
+1.7 .3.1      .         .    1.0000E+6      EPS       
+1.7 .3.2      .         .    1.0000E+6      EPS       
+1.7 .3.3      .         .    1.0000E+6      EPS       
+1.8 .1.1      .         .    1.0000E+6      EPS       
+1.8 .1.2      .         .    1.0000E+6      EPS       
+1.8 .1.3      .         .    1.0000E+6      EPS       
+1.8 .2.1      .        1.000 1.0000E+6      EPS       
+1.8 .2.2      .        1.000 1.0000E+6      EPS       
+1.8 .2.3      .         .    1.0000E+6      EPS       
+1.8 .3.1      .         .    1.0000E+6      EPS       
+1.8 .3.2      .         .    1.0000E+6      EPS       
+1.8 .3.3      .         .    1.0000E+6      EPS       
+1.9 .1.1      .         .    1.0000E+6      EPS       
+1.9 .1.2      .         .    1.0000E+6      EPS       
+1.9 .1.3      .         .    1.0000E+6      EPS       
+1.9 .2.1      .        1.000 1.0000E+6      EPS       
+1.9 .2.2      .        1.000 1.0000E+6      EPS       
+1.9 .2.3      .         .    1.0000E+6      EPS       
+1.9 .3.1      .         .    1.0000E+6      EPS       
+1.9 .3.2      .         .    1.0000E+6      EPS       
+1.9 .3.3      .         .    1.0000E+6      EPS       
+1.10.1.1      .         .    1.0000E+6      EPS       
+1.10.1.2      .         .    1.0000E+6      EPS       
+1.10.1.3      .         .    1.0000E+6      EPS       
+1.10.2.1      .         .    1.0000E+6      EPS       
+1.10.2.2      .         .    1.0000E+6      EPS       
+1.10.2.3      .         .    1.0000E+6      EPS       
+1.10.3.1      .         .    1.0000E+6      EPS       
+1.10.3.2      .         .    1.0000E+6      EPS       
+1.10.3.3      .         .    1.0000E+6      EPS       
+1.11.1.1      .         .    1.0000E+6      EPS       
+1.11.1.2      .         .    1.0000E+6      EPS       
+1.11.1.3      .         .    1.0000E+6      EPS       
+1.11.2.1      .         .    1.0000E+6      EPS       
+1.11.2.2      .         .    1.0000E+6      EPS       
+1.11.2.3      .         .    1.0000E+6      EPS       
+1.11.3.1      .         .    1.0000E+6      EPS       
+1.11.3.2      .         .    1.0000E+6      EPS       
+1.11.3.3      .         .    1.0000E+6      EPS       
+1.12.1.1      .         .    1.0000E+6      EPS       
+1.12.1.2      .         .    1.0000E+6      EPS       
+1.12.1.3      .         .    1.0000E+6      EPS       
+1.12.2.1      .         .    1.0000E+6      EPS       
+1.12.2.2      .         .    1.0000E+6      EPS       
+1.12.2.3      .         .    1.0000E+6      EPS       
+1.12.3.1      .         .    1.0000E+6      EPS       
+1.12.3.2      .         .    1.0000E+6      EPS       
+1.12.3.3      .         .    1.0000E+6      EPS       
+1.13.1.1      .         .    1.0000E+6      EPS       
+1.13.1.2      .         .    1.0000E+6      EPS       
+1.13.1.3      .         .    1.0000E+6      EPS       
+1.13.2.1      .         .    1.0000E+6      EPS       
+1.13.2.2      .         .    1.0000E+6      EPS       
+1.13.2.3      .         .    1.0000E+6      EPS       
+1.13.3.1      .         .    1.0000E+6      EPS       
+1.13.3.2      .         .    1.0000E+6      EPS       
+1.13.3.3      .         .    1.0000E+6      EPS       
+1.14.1.1      .         .    1.0000E+6      EPS       
+1.14.1.2      .         .    1.0000E+6      EPS       
+1.14.1.3      .         .    1.0000E+6      EPS       
+1.14.2.1      .         .    1.0000E+6      EPS       
+1.14.2.2      .         .    1.0000E+6      EPS       
+1.14.2.3      .         .    1.0000E+6      EPS       
+1.14.3.1      .         .    1.0000E+6      EPS       
+1.14.3.2      .         .    1.0000E+6      EPS       
+1.14.3.3      .         .    1.0000E+6      EPS       
+1.15.1.1      .         .    1.0000E+6      EPS       
+1.15.1.2      .         .    1.0000E+6      EPS       
+1.15.1.3      .         .    1.0000E+6      EPS       
+1.15.2.1      .         .    1.0000E+6      EPS       
+1.15.2.2      .         .    1.0000E+6      EPS       
+1.15.2.3      .         .    1.0000E+6      EPS       
+1.15.3.1      .         .    1.0000E+6      EPS       
+1.15.3.2      .         .    1.0000E+6      EPS       
+1.15.3.3      .         .    1.0000E+6      EPS       
+1.16.1.1      .         .    1.0000E+6      EPS       
+1.16.1.2      .         .    1.0000E+6      EPS       
+1.16.1.3      .         .    1.0000E+6      EPS       
+1.16.2.1      .         .    1.0000E+6      EPS       
+1.16.2.2      .         .    1.0000E+6      EPS       
+1.16.2.3      .         .    1.0000E+6      EPS       
+1.16.3.1      .         .    1.0000E+6      EPS       
+1.16.3.2      .         .    1.0000E+6      EPS       
+1.16.3.3      .         .    1.0000E+6      EPS       
+1.17.1.1      .         .    1.0000E+6      EPS       
+1.17.1.2      .         .    1.0000E+6      EPS       
+1.17.1.3      .         .    1.0000E+6      EPS       
+1.17.2.1      .         .    1.0000E+6      EPS       
+1.17.2.2      .         .    1.0000E+6      EPS       
+1.17.2.3      .         .    1.0000E+6      EPS       
+1.17.3.1      .         .    1.0000E+6      EPS       
+1.17.3.2      .         .    1.0000E+6      EPS       
+1.17.3.3      .         .    1.0000E+6      EPS       
+1.18.1.1      .         .    1.0000E+6      EPS       
+1.18.1.2      .         .    1.0000E+6      EPS       
+1.18.1.3      .         .    1.0000E+6      EPS       
+1.18.2.1      .         .    1.0000E+6      EPS       
+1.18.2.2      .         .    1.0000E+6      EPS       
+1.18.2.3      .         .    1.0000E+6      EPS       
+1.18.3.1      .         .    1.0000E+6      EPS       
+1.18.3.2      .         .    1.0000E+6      EPS       
+1.18.3.3      .         .    1.0000E+6      EPS       
+1.19.1.1      .         .    1.0000E+6      EPS       
+1.19.1.2      .         .    1.0000E+6      EPS       
+1.19.1.3      .         .    1.0000E+6      EPS       
+1.19.2.1      .         .    1.0000E+6      EPS       
+1.19.2.2      .         .    1.0000E+6      EPS       
+1.19.2.3      .         .    1.0000E+6      EPS       
+1.19.3.1      .         .    1.0000E+6      EPS       
+1.19.3.2      .         .    1.0000E+6      EPS       
+1.19.3.3      .         .    1.0000E+6      EPS       
+1.20.1.1      .         .    1.0000E+6      EPS       
+1.20.1.2      .         .    1.0000E+6      EPS       
+1.20.1.3      .         .    1.0000E+6      EPS       
+1.20.2.1      .        1.000 1.0000E+6      EPS       
+1.20.2.2      .        1.000 1.0000E+6      EPS       
+1.20.2.3      .         .    1.0000E+6      EPS       
+1.20.3.1      .         .    1.0000E+6      EPS       
+1.20.3.2      .         .    1.0000E+6      EPS       
+1.20.3.3      .         .    1.0000E+6      EPS       
+2.1 .1.1      .         .    1.0000E+6      EPS       
+2.1 .1.2      .         .    1.0000E+6      EPS       
+2.1 .1.3      .         .    1.0000E+6      EPS       
+2.1 .2.1      .         .    1.0000E+6      EPS       
+2.1 .2.2      .         .    1.0000E+6      EPS       
+2.1 .2.3      .         .    1.0000E+6      EPS       
+2.1 .3.1      .         .    1.0000E+6      EPS       
+2.1 .3.2      .         .    1.0000E+6      EPS       
+2.1 .3.3      .         .    1.0000E+6      EPS       
+2.2 .1.1      .         .    1.0000E+6      EPS       
+2.2 .1.2      .         .    1.0000E+6      EPS       
+2.2 .1.3      .         .    1.0000E+6      EPS       
+2.2 .2.1      .         .    1.0000E+6      EPS       
+2.2 .2.2      .         .    1.0000E+6      EPS       
+2.2 .2.3      .         .    1.0000E+6      EPS       
+2.2 .3.1      .         .    1.0000E+6      EPS       
+2.2 .3.2      .         .    1.0000E+6      EPS       
+2.2 .3.3      .         .    1.0000E+6      EPS       
+2.3 .1.1      .         .    1.0000E+6      EPS       
+2.3 .1.2      .         .    1.0000E+6      EPS       
+2.3 .1.3      .         .    1.0000E+6      EPS       
+2.3 .2.1      .         .    1.0000E+6      EPS       
+2.3 .2.2      .         .    1.0000E+6      EPS       
+2.3 .2.3      .         .    1.0000E+6      EPS       
+2.3 .3.1      .         .    1.0000E+6      EPS       
+2.3 .3.2      .         .    1.0000E+6      EPS       
+2.3 .3.3      .         .    1.0000E+6      EPS       
+2.4 .1.1      .         .    1.0000E+6      EPS       
+2.4 .1.2      .         .    1.0000E+6      EPS       
+2.4 .1.3      .         .    1.0000E+6      EPS       
+2.4 .2.1      .         .    1.0000E+6      EPS       
+2.4 .2.2      .         .    1.0000E+6      EPS       
+2.4 .2.3      .         .    1.0000E+6      EPS       
+2.4 .3.1      .         .    1.0000E+6      EPS       
+2.4 .3.2      .         .    1.0000E+6      EPS       
+2.4 .3.3      .         .    1.0000E+6      EPS       
+2.5 .1.1      .         .    1.0000E+6      EPS       
+2.5 .1.2      .         .    1.0000E+6      EPS       
+2.5 .1.3      .         .    1.0000E+6      EPS       
+2.5 .2.1      .         .    1.0000E+6      EPS       
+2.5 .2.2      .         .    1.0000E+6      EPS       
+2.5 .2.3      .         .    1.0000E+6      EPS       
+2.5 .3.1      .         .    1.0000E+6      EPS       
+2.5 .3.2      .         .    1.0000E+6      EPS       
+2.5 .3.3      .         .    1.0000E+6      EPS       
+2.6 .1.1      .         .    1.0000E+6      EPS       
+2.6 .1.2      .         .    1.0000E+6      EPS       
+2.6 .1.3      .         .    1.0000E+6      EPS       
+2.6 .2.1      .         .    1.0000E+6      EPS       
+2.6 .2.2      .         .    1.0000E+6      EPS       
+2.6 .2.3      .         .    1.0000E+6      EPS       
+2.6 .3.1      .         .    1.0000E+6      EPS       
+2.6 .3.2      .         .    1.0000E+6      EPS       
+2.6 .3.3      .         .    1.0000E+6      EPS       
+2.7 .1.1      .         .    1.0000E+6      EPS       
+2.7 .1.2      .         .    1.0000E+6      EPS       
+2.7 .1.3      .         .    1.0000E+6      EPS       
+2.7 .2.1      .         .    1.0000E+6      EPS       
+2.7 .2.2      .         .    1.0000E+6      EPS       
+2.7 .2.3      .         .    1.0000E+6      EPS       
+2.7 .3.1      .         .    1.0000E+6      EPS       
+2.7 .3.2      .         .    1.0000E+6      EPS       
+2.7 .3.3      .         .    1.0000E+6      EPS       
+2.8 .1.1      .         .    1.0000E+6      EPS       
+2.8 .1.2      .         .    1.0000E+6      EPS       
+2.8 .1.3      .         .    1.0000E+6      EPS       
+2.8 .2.1      .         .    1.0000E+6      EPS       
+2.8 .2.2      .         .    1.0000E+6      EPS       
+2.8 .2.3      .         .    1.0000E+6      EPS       
+2.8 .3.1      .         .    1.0000E+6      EPS       
+2.8 .3.2      .         .    1.0000E+6      EPS       
+2.8 .3.3      .         .    1.0000E+6      EPS       
+2.9 .1.1      .         .    1.0000E+6      EPS       
+2.9 .1.2      .         .    1.0000E+6      EPS       
+2.9 .1.3      .         .    1.0000E+6      EPS       
+2.9 .2.1      .         .    1.0000E+6      EPS       
+2.9 .2.2      .         .    1.0000E+6      EPS       
+2.9 .2.3      .         .    1.0000E+6      EPS       
+2.9 .3.1      .         .    1.0000E+6      EPS       
+2.9 .3.2      .         .    1.0000E+6      EPS       
+2.9 .3.3      .         .    1.0000E+6      EPS       
+2.10.1.1      .         .    1.0000E+6      EPS       
+2.10.1.2      .         .    1.0000E+6      EPS       
+2.10.1.3      .         .    1.0000E+6      EPS       
+2.10.2.1      .         .    1.0000E+6      EPS       
+2.10.2.2      .         .    1.0000E+6      EPS       
+2.10.2.3      .         .    1.0000E+6      EPS       
+2.10.3.1      .         .    1.0000E+6      EPS       
+2.10.3.2      .         .    1.0000E+6      EPS       
+2.10.3.3      .         .    1.0000E+6      EPS       
+2.11.1.1      .         .    1.0000E+6      EPS       
+2.11.1.2      .         .    1.0000E+6      EPS       
+2.11.1.3      .         .    1.0000E+6      EPS       
+2.11.2.1      .         .    1.0000E+6      EPS       
+2.11.2.2      .         .    1.0000E+6      EPS       
+2.11.2.3      .         .    1.0000E+6      EPS       
+2.11.3.1      .         .    1.0000E+6      EPS       
+2.11.3.2      .         .    1.0000E+6      EPS       
+2.11.3.3      .         .    1.0000E+6      EPS       
+2.12.1.1      .         .    1.0000E+6      EPS       
+2.12.1.2      .         .    1.0000E+6      EPS       
+2.12.1.3      .         .    1.0000E+6      EPS       
+2.12.2.1      .         .    1.0000E+6      EPS       
+2.12.2.2      .         .    1.0000E+6      EPS       
+2.12.2.3      .         .    1.0000E+6      EPS       
+2.12.3.1      .         .    1.0000E+6      EPS       
+2.12.3.2      .         .    1.0000E+6      EPS       
+2.12.3.3      .         .    1.0000E+6      EPS       
+2.13.1.1      .         .    1.0000E+6      EPS       
+2.13.1.2      .         .    1.0000E+6      EPS       
+2.13.1.3      .         .    1.0000E+6      EPS       
+2.13.2.1      .         .    1.0000E+6      EPS       
+2.13.2.2      .         .    1.0000E+6      EPS       
+2.13.2.3      .         .    1.0000E+6      EPS       
+2.13.3.1      .         .    1.0000E+6      EPS       
+2.13.3.2      .         .    1.0000E+6      EPS       
+2.13.3.3      .         .    1.0000E+6      EPS       
+2.14.1.1      .         .    1.0000E+6      EPS       
+2.14.1.2      .         .    1.0000E+6      EPS       
+2.14.1.3      .         .    1.0000E+6      EPS       
+2.14.2.1      .         .    1.0000E+6      EPS       
+2.14.2.2      .         .    1.0000E+6      EPS       
+2.14.2.3      .         .    1.0000E+6      EPS       
+2.14.3.1      .         .    1.0000E+6      EPS       
+2.14.3.2      .         .    1.0000E+6      EPS       
+2.14.3.3      .         .    1.0000E+6      EPS       
+2.15.1.1      .         .    1.0000E+6      EPS       
+2.15.1.2      .         .    1.0000E+6      EPS       
+2.15.1.3      .         .    1.0000E+6      EPS       
+2.15.2.1      .         .    1.0000E+6      EPS       
+2.15.2.2      .         .    1.0000E+6      EPS       
+2.15.2.3      .         .    1.0000E+6      EPS       
+2.15.3.1      .         .    1.0000E+6      EPS       
+2.15.3.2      .         .    1.0000E+6      EPS       
+2.15.3.3      .         .    1.0000E+6      EPS       
+2.16.1.1      .         .    1.0000E+6      EPS       
+2.16.1.2      .         .    1.0000E+6      EPS       
+2.16.1.3      .         .    1.0000E+6      EPS       
+2.16.2.1      .         .    1.0000E+6      EPS       
+2.16.2.2      .         .    1.0000E+6      EPS       
+2.16.2.3      .         .    1.0000E+6      EPS       
+2.16.3.1      .         .    1.0000E+6      EPS       
+2.16.3.2      .         .    1.0000E+6      EPS       
+2.16.3.3      .         .    1.0000E+6      EPS       
+2.17.1.1      .         .    1.0000E+6      EPS       
+2.17.1.2      .         .    1.0000E+6      EPS       
+2.17.1.3      .         .    1.0000E+6      EPS       
+2.17.2.1      .         .    1.0000E+6      EPS       
+2.17.2.2      .         .    1.0000E+6      EPS       
+2.17.2.3      .         .    1.0000E+6      EPS       
+2.17.3.1      .         .    1.0000E+6      EPS       
+2.17.3.2      .         .    1.0000E+6      EPS       
+2.17.3.3      .         .    1.0000E+6      EPS       
+2.18.1.1      .         .    1.0000E+6      EPS       
+2.18.1.2      .         .    1.0000E+6      EPS       
+2.18.1.3      .         .    1.0000E+6      EPS       
+2.18.2.1      .         .    1.0000E+6      EPS       
+2.18.2.2      .         .    1.0000E+6      EPS       
+2.18.2.3      .         .    1.0000E+6      EPS       
+2.18.3.1      .         .    1.0000E+6      EPS       
+2.18.3.2      .         .    1.0000E+6      EPS       
+2.18.3.3      .         .    1.0000E+6      EPS       
+2.19.1.1      .         .    1.0000E+6      EPS       
+2.19.1.2      .         .    1.0000E+6      EPS       
+2.19.1.3      .         .    1.0000E+6      EPS       
+2.19.2.1      .         .    1.0000E+6      EPS       
+2.19.2.2      .         .    1.0000E+6      EPS       
+2.19.2.3      .         .    1.0000E+6      EPS       
+2.19.3.1      .         .    1.0000E+6      EPS       
+2.19.3.2      .         .    1.0000E+6      EPS       
+2.19.3.3      .         .    1.0000E+6      EPS       
+2.20.1.1      .         .    1.0000E+6      EPS       
+2.20.1.2      .         .    1.0000E+6      EPS       
+2.20.1.3      .         .    1.0000E+6      EPS       
+2.20.2.1      .         .    1.0000E+6      EPS       
+2.20.2.2      .         .    1.0000E+6      EPS       
+2.20.2.3      .         .    1.0000E+6      EPS       
+2.20.3.1      .         .    1.0000E+6      EPS       
+2.20.3.2      .         .    1.0000E+6      EPS       
+2.20.3.3      .         .    1.0000E+6      EPS       
+
+---- VAR sold  number of output coil j sold in month t
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .       10.000    10.000      
+1.2      .         .         .       10.000      
+1.3      .         .         .       10.000      
+2.1      .         .         .       20.000      
+2.2      .       20.000    20.000    20.000      
+2.3      .         .         .       20.000      
+3.1      .         .         .       40.000      
+3.2      .         .         .       40.000      
+3.3      .         .         .       40.000      
+
+---- VAR r  total number of unused input coil i in month t
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .       10.000 1.0000E+6      EPS       
+1.2      .         .    1.0000E+6      EPS       
+1.3      .         .    1.0000E+6      EPS       
+2.1      .         .    1.0000E+6      EPS       
+2.2      .         .    1.0000E+6      EPS       
+2.3      .         .    1.0000E+6      EPS       
+
+---- VAR Out  number of inventory for type j output coil from month t
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .         .      100.000      EPS       
+1.2      .         .      100.000      EPS       
+1.3      .         .      100.000      EPS       
+2.1      .       10.000   100.000      EPS       
+2.2      .         .      100.000      EPS       
+2.3      .         .      100.000      EPS       
+3.1      .         .      100.000      EPS       
+3.2      .         .      100.000      EPS       
+3.3      .         .      100.000      EPS       
+
+---- VAR In  number of inventory for type i input coil from month t
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .       10.000   100.000      EPS       
+1.2      .         .      100.000      EPS       
+1.3      .         .      100.000      EPS       
+2.1      .         .      100.000      EPS       
+2.2      .         .      100.000      EPS       
+2.3      .         .      100.000      EPS       
+
+---- VAR BP  number of bundles purchased in month t
+
+     LOWER     LEVEL     UPPER    MARGINAL
+
+1      .         .    1.0000E+6   -20.000      
+2      .         .    1.0000E+6   -20.000      
+3      .         .    1.0000E+6   -20.000      
+
+---- VAR v  number of individual input coil i purchased in month t
+
+       LOWER     LEVEL     UPPER    MARGINAL
+
+1.1      .       15.000 1.0000E+6    -5.000      
+1.2      .         .    1.0000E+6    -5.000      
+1.3      .         .    1.0000E+6    -5.000      
+2.1      .         .    1.0000E+6   -15.000      
+2.2      .         .    1.0000E+6   -15.000      
+2.3      .         .    1.0000E+6   -15.000      
+
+---- VAR count  
+
+          LOWER     LEVEL     UPPER    MARGINAL
+
+1.1 .1      .        1.000     1.000      EPS       
+1.1 .2      .        1.000     1.000      EPS       
+1.1 .3      .         .        1.000      EPS       
+1.2 .1      .        1.000     1.000      EPS       
+1.2 .2      .        1.000     1.000      EPS       
+1.2 .3      .         .        1.000      EPS       
+1.3 .1      .        1.000     1.000      EPS       
+1.3 .2      .        1.000     1.000      EPS       
+1.3 .3      .         .        1.000      EPS       
+1.4 .1      .        1.000     1.000      EPS       
+1.4 .2      .        1.000     1.000      EPS       
+1.4 .3      .         .        1.000      EPS       
+1.5 .1      .        1.000     1.000      EPS       
+1.5 .2      .        1.000     1.000      EPS       
+1.5 .3      .         .        1.000      EPS       
+1.6 .1      .         .        1.000      EPS       
+1.6 .2      .        1.000     1.000      EPS       
+1.6 .3      .         .        1.000      EPS       
+1.7 .1      .         .        1.000      EPS       
+1.7 .2      .        1.000     1.000      EPS       
+1.7 .3      .         .        1.000      EPS       
+1.8 .1      .         .        1.000      EPS       
+1.8 .2      .        1.000     1.000      EPS       
+1.8 .3      .         .        1.000      EPS       
+1.9 .1      .         .        1.000      EPS       
+1.9 .2      .        1.000     1.000      EPS       
+1.9 .3      .         .        1.000      EPS       
+1.10.1      .         .        1.000      EPS       
+1.10.2      .         .        1.000      EPS       
+1.10.3      .         .        1.000      EPS       
+1.11.1      .         .        1.000      EPS       
+1.11.2      .         .        1.000      EPS       
+1.11.3      .         .        1.000      EPS       
+1.12.1      .         .        1.000      EPS       
+1.12.2      .         .        1.000      EPS       
+1.12.3      .         .        1.000      EPS       
+1.13.1      .         .        1.000      EPS       
+1.13.2      .         .        1.000      EPS       
+1.13.3      .         .        1.000      EPS       
+1.14.1      .         .        1.000      EPS       
+1.14.2      .         .        1.000      EPS       
+1.14.3      .         .        1.000      EPS       
+1.15.1      .         .        1.000      EPS       
+1.15.2      .         .        1.000      EPS       
+1.15.3      .         .        1.000      EPS       
+1.16.1      .         .        1.000      EPS       
+1.16.2      .         .        1.000      EPS       
+1.16.3      .         .        1.000      EPS       
+1.17.1      .         .        1.000      EPS       
+1.17.2      .         .        1.000      EPS       
+1.17.3      .         .        1.000      EPS       
+1.18.1      .         .        1.000      EPS       
+1.18.2      .         .        1.000      EPS       
+1.18.3      .         .        1.000      EPS       
+1.19.1      .         .        1.000      EPS       
+1.19.2      .         .        1.000      EPS       
+1.19.3      .         .        1.000      EPS       
+1.20.1      .         .        1.000      EPS       
+1.20.2      .        1.000     1.000      EPS       
+1.20.3      .         .        1.000      EPS       
+2.1 .1      .         .        1.000      EPS       
+2.1 .2      .         .        1.000      EPS       
+2.1 .3      .         .        1.000      EPS       
+2.2 .1      .         .        1.000      EPS       
+2.2 .2      .         .        1.000      EPS       
+2.2 .3      .         .        1.000      EPS       
+2.3 .1      .         .        1.000      EPS       
+2.3 .2      .         .        1.000      EPS       
+2.3 .3      .         .        1.000      EPS       
+2.4 .1      .         .        1.000      EPS       
+2.4 .2      .         .        1.000      EPS       
+2.4 .3      .         .        1.000      EPS       
+2.5 .1      .         .        1.000      EPS       
+2.5 .2      .         .        1.000      EPS       
+2.5 .3      .         .        1.000      EPS       
+2.6 .1      .         .        1.000      EPS       
+2.6 .2      .         .        1.000      EPS       
+2.6 .3      .         .        1.000      EPS       
+2.7 .1      .         .        1.000      EPS       
+2.7 .2      .         .        1.000      EPS       
+2.7 .3      .         .        1.000      EPS       
+2.8 .1      .         .        1.000      EPS       
+2.8 .2      .         .        1.000      EPS       
+2.8 .3      .         .        1.000      EPS       
+2.9 .1      .         .        1.000      EPS       
+2.9 .2      .         .        1.000      EPS       
+2.9 .3      .         .        1.000      EPS       
+2.10.1      .         .        1.000      EPS       
+2.10.2      .         .        1.000      EPS       
+2.10.3      .         .        1.000      EPS       
+2.11.1      .         .        1.000      EPS       
+2.11.2      .         .        1.000      EPS       
+2.11.3      .         .        1.000      EPS       
+2.12.1      .         .        1.000      EPS       
+2.12.2      .         .        1.000      EPS       
+2.12.3      .         .        1.000      EPS       
+2.13.1      .         .        1.000      EPS       
+2.13.2      .         .        1.000      EPS       
+2.13.3      .         .        1.000      EPS       
+2.14.1      .         .        1.000      EPS       
+2.14.2      .         .        1.000      EPS       
+2.14.3      .         .        1.000      EPS       
+2.15.1      .         .        1.000      EPS       
+2.15.2      .         .        1.000      EPS       
+2.15.3      .         .        1.000      EPS       
+2.16.1      .         .        1.000      EPS       
+2.16.2      .         .        1.000      EPS       
+2.16.3      .         .        1.000      EPS       
+2.17.1      .         .        1.000      EPS       
+2.17.2      .         .        1.000      EPS       
+2.17.3      .         .        1.000      EPS       
+2.18.1      .         .        1.000      EPS       
+2.18.2      .         .        1.000      EPS       
+2.18.3      .         .        1.000      EPS       
+2.19.1      .         .        1.000      EPS       
+2.19.2      .         .        1.000      EPS       
+2.19.3      .         .        1.000      EPS       
+2.20.1      .         .        1.000      EPS       
+2.20.2      .         .        1.000      EPS       
+2.20.3      .         .        1.000      EPS       
+
+                       LOWER     LEVEL     UPPER    MARGINAL
+
+---- VAR z              -INF    325.000     +INF       .         
+
+  z  total profit
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+
+
+EXECUTION TIME       =        0.013 SECONDS      2 Mb  LNX220-143 Jul 27, 2005
+
+
+USER: MCS Department                                 G051222:1141CS-LNX
+      Argonne National Labs                                      DC2747
+
+
+**** FILE SUMMARY
+
+Input      /nfs/mcs-homes64/neosotc/.neos5/jobs/797955/gams.mod
+Output     /nfs/mcs-homes64/neosotc/.neos5/jobs/797955/solve.out
+</PRE>
+    <P><hr>
+    <center><p>
+    <a href ="http://neos.mcs.anl.gov/neos" >
+    <img src="http://neos.mcs.anl.gov/neos/images/neos_home.jpg"
+      border=0 alt="NEOS Server"></a>

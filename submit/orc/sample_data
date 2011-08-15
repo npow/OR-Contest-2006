@@ -1,0 +1,55 @@
+Scalar
+    c0      'cost per bundle'                                                   /20/
+    M       'max number of output coils that can be processed in one month'     /10/
+    L       'amount lost each time an input coil is cut'                        /1/;
+
+Sets
+    i       'number of input coils'                         /1*2/
+    j       'number of output coils'                        /1*3/
+    h       'number of input coils of type i purchased'     /1*20/
+    t       'number of periods we consider'                 /1*3/
+    s       'output coil size'                              /small, medium, large/
+    a(j)    'number for small output coils'                 /1*1/
+    b(j)    'number for medium output coils'                /2*2/
+    k(j)    'number for large output coils'                 /3*3/
+    small(s)  'small size'                                  /small/
+    medium(s) 'medium size'                                 /medium/
+    large(s)  'large size'                                  /large/;
+
+Parameters
+IW(i) Input Coil Widths
+     /1         3
+      2         0/
+
+c(i) Input Coil Costs
+     /1         5
+      2        15/
+
+n(i) Input Coil per Bundle
+     /1        2
+      2        1/
+
+OW(j) Output Coil Widths
+     /1         2
+      2         3
+      3        30/
+
+P(j)  Product coil Price
+     /1        10
+      2        20
+      3        40/
+
+Cap(i) The inventory capacity for each input coil
+     /1        30
+      2        20/
+
+O(s) inventory capacity for output coil
+    /small       50
+     medium      60
+     large       40/
+
+Table d(j,t) Expected Demand
+         1         2           3
+1       10         0           0
+2        0        20           0
+3        0         0           0;
